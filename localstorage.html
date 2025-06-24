@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Simulador de Pedido</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #fdf5e6;
+      color: #333;
+      padding: 20px;
+      max-width: 600px;
+      margin: auto;
+    }
+    h1 {
+      text-align: center;
+    }
+    .ingredientes {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    label {
+      background: #ffdb99;
+      padding: 10px;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    button {
+      background: #ff9900;
+      color: white;
+      padding: 10px 15px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      margin-top: 10px;
+    }
+    .resultado {
+      background: #fff0cc;
+      padding: 15px;
+      border-radius: 8px;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Monte Seu Lanche 🍔</h1>
+
+  <div class="ingredientes">
+    <label><input type="checkbox" value="Pão"> Pão</label> <br>
+    <label><input type="checkbox" value="Carne"> Carne</label> <br>
+    <label><input type="checkbox" value="Queijo"> Queijo</label> <br>
+    <label><input type="checkbox" value="Bacon"> Bacon</label> <br>
+    <label><input type="checkbox" value="Alface"> Alface</label><br>
+    <label><input type="checkbox" value="Tomate"> Tomate</label><br>
+    <label><input type="checkbox" value="Molho Especial"> Molho Especial</label>
+  </div>
+
+  <button onclick="montarPedido()">Montar Pedido</button>
+  <button onclick="salvarFavorito()">Salvar como Favorito ⭐</button>
+
+  <div class="resultado" id="resultado"></div>
+
+  <script>
+    // Mostrar favorito ao abrir a página
+    window.onload = function() {
+      const favorito = localStorage.getItem("pedidoFavorito");
+      if (favorito) {
+        document.getElementById("resultado").innerHTML = `<strong>Pedido Favorito:</strong> ${favorito}`;
+      }
+    };
+
+    function montarPedido() {
+      const selecionados = [...document.querySelectorAll('input[type="checkbox"]:checked')]
+        .map(cb => cb.value);
+      const resultado = document.getElementById("resultado");
+
+      if (selecionados.length === 0) {
+        resultado.innerHTML = "Nenhum ingrediente selecionado!";
+      } else {
+        resultado.innerHTML = `<strong>Seu Pedido:</strong> ${selecionados.join(', ')}`;
+      }
+    }
+
+    function salvarFavorito() {
+      const selecionados = [...document.querySelectorAll('input[type="checkbox"]:checked')]
+        .map(cb => cb.value);
+
+      if (selecionados.length === 0) {
+        alert("Escolha ingredientes antes de salvar!");
+        return;
+      }
+
+      localStorage.setItem("pedidoFavorito", selecionados.join(', '));
+      alert("Pedido favorito salvo!");
+    }
+  </script>
+
+</body>
+</html>
