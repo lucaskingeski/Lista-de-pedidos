@@ -5,28 +5,40 @@
   <title>Simulador de Pedido</title>
   <style>
     body {
-      font-family: Arial, sans-serif;
+      font-family: 'Segoe UI', sans-serif;
       background: #fdf5e6;
       color: #333;
       padding: 20px;
-      max-width: 600px;
+      max-width: 700px;
       margin: auto;
     }
+
     h1 {
       text-align: center;
+      margin-bottom: 20px;
     }
+
     .ingredientes {
       display: flex;
       flex-wrap: wrap;
       gap: 10px;
+      justify-content: center;
       margin-bottom: 20px;
     }
+
     label {
-      background: #ffdb99;
-      padding: 10px;
+      background: #ffe0b3;
+      padding: 10px 15px;
       border-radius: 8px;
       cursor: pointer;
+      transition: background 0.3s, transform 0.2s;
     }
+
+    label:hover {
+      background: #ffd28a;
+      transform: scale(1.05);
+    }
+
     button {
       background: #ff9900;
       color: white;
@@ -34,13 +46,40 @@
       border: none;
       border-radius: 6px;
       cursor: pointer;
-      margin-top: 10px;
+      margin: 5px;
+      transition: background 0.3s;
     }
-    .resultado {
+
+    button:hover {
+      background: #e68a00;
+    }
+
+    .resultado, .favorito, .salvos {
       background: #fff0cc;
       padding: 15px;
       border-radius: 8px;
       margin-top: 20px;
+    }
+
+    ul {
+      padding-left: 20px;
+    }
+
+    .pedido-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+
+    .pedido-item button {
+      background: #cc3300;
+      padding: 5px 10px;
+      font-size: 0.8em;
+    }
+
+    .pedido-item button:hover {
+      background: #aa2200;
     }
   </style>
 </head>
@@ -49,53 +88,108 @@
   <h1>Monte Seu Lanche 🍔</h1>
 
   <div class="ingredientes">
-    <label><input type="checkbox" value="Pão"> Pão</label> <br>
-    <label><input type="checkbox" value="Carne"> Carne</label> <br>
-    <label><input type="checkbox" value="Queijo"> Queijo</label> <br>
-    <label><input type="checkbox" value="Bacon"> Bacon</label> <br>
-    <label><input type="checkbox" value="Alface"> Alface</label><br>
-    <label><input type="checkbox" value="Tomate"> Tomate</label><br>    
+    <label><input type="checkbox" value="Pão"> Pão</label>
+    <label><input type="checkbox" value="Carne"> Carne</label>
+    <label><input type="checkbox" value="Queijo"> Queijo</label>
+    <label><input type="checkbox" value="Bacon"> Bacon</label>
+    <label><input type="checkbox" value="Alface"> Alface</label>
+    <label><input type="checkbox" value="Tomate"> Tomate</label>    
     <label><input type="checkbox" value="Molho Especial"> Molho Especial</label>
   </div>
 
-  <button onclick="montarPedido()">Montar Pedido</button>
-  <button onclick="salvarFavorito()">Salvar como Favorito ⭐</button>
+  <div style="text-align: center;">
+    <button id="btnMontar">Montar Pedido</button>
+    <button id="btnFavorito">Salvar como Favorito ⭐</button>
+    <button id="btnSalvar">Salvar Pedido 📦</button>
+  </div>
 
+  <div class="favorito" id="favorito"></div>
   <div class="resultado" id="resultado"></div>
+  <div class="salvos" id="salvos"></div>
 
   <script>
-    // Mostrar favorito ao abrir a página
-    window.onload = function() {
+    document.addEventListener('DOMContentLoaded', () => {
+      // ELEMENTOS
+      const btnMontar = document.getElementById("btnMontar");
+      const btnFavorito = document.getElementById("btnFavorito");
+      const btnSalvar = document.getElementById("btnSalvar");
+      const resultado = document.getElementById("resultado");
+      const favoritoBox = document.getElementById("favorito");
+      const salvosBox = document.getElementById("salvos");
+
+      // EVENT LISTENER 1 - Mostrar favorito ao carregar a página
       const favorito = localStorage.getItem("pedidoFavorito");
       if (favorito) {
-        document.getElementById("resultado").innerHTML = `<strong>Pedido Favorito:</strong> ${favorito}`;
+        favoritoBox.innerHTML = `<strong>Pedido Favorito:</strong> ${favorito}`;
       }
-    };
+      atualizarPedidosSalvos();
 
-    function montarPedido() {
-      const selecionados = [...document.querySelectorAll('input[type="checkbox"]:checked')]
-        .map(cb => cb.value);
-      const resultado = document.getElementById("resultado");
-
-      if (selecionados.length === 0) {
-        resultado.innerHTML = "Nenhum ingrediente selecionado!";
-      } else {
-        resultado.innerHTML = `<strong>Seu Pedido:</strong> ${selecionados.join(', ')}`;
-      }
-    }
-
-    function salvarFavorito() {
-      const selecionados = [...document.querySelectorAll('input[type="checkbox"]:checked')]
-        .map(cb => cb.value);
-
-      if (selecionados.length === 0) {
-        alert("Escolha ingredientes antes de salvar!");
-        return;
+      // Função utilitária: obter os ingredientes marcados
+      function getIngredientesSelecionados() {
+        return [...document.querySelectorAll('input[type="checkbox"]:checked')]
+          .map(cb => cb.value);
       }
 
-      localStorage.setItem("pedidoFavorito", selecionados.join(', '));
-      alert("Pedido favorito salvo!");
-    }
+      // EVENT LISTENER 2 - Montar pedido atual
+      btnMontar.addEventListener('click', () => {
+        const selecionados = getIngredientesSelecionados();
+        if (selecionados.length === 0) {
+          resultado.innerHTML = "Nenhum ingrediente selecionado!";
+        } else {
+          resultado.innerHTML = `<strong>Seu Pedido:</strong> ${selecionados.join(', ')}`;
+        }
+      });
+
+      // EVENT LISTENER 3 - Salvar pedido favorito
+      btnFavorito.addEventListener('click', () => {
+        const selecionados = getIngredientesSelecionados();
+        if (selecionados.length === 0) {
+          alert("Escolha ingredientes antes de salvar como favorito!");
+          return;
+        }
+        const pedido = selecionados.join(', ');
+        localStorage.setItem("pedidoFavorito", pedido);
+        favoritoBox.innerHTML = `<strong>Pedido Favorito:</strong> ${pedido}`;
+        alert("Pedido favorito salvo!");
+      });
+
+      // EVENT LISTENER 4 - Salvar pedido comum
+      btnSalvar.addEventListener('click', () => {
+        const selecionados = getIngredientesSelecionados();
+        if (selecionados.length === 0) {
+          alert("Escolha ingredientes antes de salvar!");
+          return;
+        }
+        const pedido = selecionados.join(', ');
+        const pedidos = JSON.parse(localStorage.getItem("pedidosSalvos")) || [];
+        pedidos.push(pedido);
+        localStorage.setItem("pedidosSalvos", JSON.stringify(pedidos));
+        atualizarPedidosSalvos();
+        alert("Pedido salvo com sucesso!");
+      });
+
+      // Função para atualizar lista de pedidos salvos
+      function atualizarPedidosSalvos() {
+        const pedidos = JSON.parse(localStorage.getItem("pedidosSalvos")) || [];
+        if (pedidos.length > 0) {
+          salvosBox.innerHTML = `<strong>Pedidos Salvos:</strong><ul>${pedidos.map((p, i) => `
+            <li class="pedido-item">
+              ${p}
+              <button onclick="removerPedido(${i})">Remover</button>
+            </li>`).join('')}</ul>`;
+        } else {
+          salvosBox.innerHTML = '';
+        }
+      }
+
+      // Torna a função disponível globalmente
+      window.removerPedido = function(index) {
+        const pedidos = JSON.parse(localStorage.getItem("pedidosSalvos")) || [];
+        pedidos.splice(index, 1);
+        localStorage.setItem("pedidosSalvos", JSON.stringify(pedidos));
+        atualizarPedidosSalvos();
+      };
+    });
   </script>
 
 </body>
