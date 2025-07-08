@@ -81,9 +81,42 @@
     .pedido-item button:hover {
       background: #aa2200;
     }
+    .modo-escuro {
+  background: #1e1e1e;
+  color: #f0f0f0;
+    }
+
+  .modo-escuro .ingredientes label {
+      background: #333;
+      color: #f0f0f0;
+    }
+
+  .modo-escuro .ingredientes label:hover {
+      background: #444;
+    }
+
+  .modo-escuro .resultado,
+  .modo-escuro .favorito,
+  .modo-escuro .salvos {
+      background: #2c2c2c;
+    }
+
+  .modo-escuro button {
+      background: #444;
+      color: #f0f0f0;
+    }
+
+  .modo-escuro button:hover {
+      background: #666;
+    }
+
   </style>
 </head>
-<body>
+<body id="body">
+
+  <div>
+    <button id="toggleTema">Modo Escuro 🌙</button>
+  </div>
 
   <h1>Monte Seu Lanche 🍔</h1>
 
@@ -189,7 +222,30 @@
         localStorage.setItem("pedidosSalvos", JSON.stringify(pedidos));
         atualizarPedidosSalvos();
       };
-    });
+      // EVENT LISTENER - Alternar tema claro/escuro
+      const btnTema = document.getElementById("toggleTema");
+
+      btnTema.addEventListener("click", () => {
+      document.body.classList.toggle("modo-escuro");
+
+      // Atualiza o texto do botão
+      if (document.body.classList.contains("modo-escuro")) {
+          btnTema.textContent = "☀️ Modo Claro";
+         localStorage.setItem("tema", "escuro");
+        } else {
+          btnTema.textContent = "🌙 Modo Escuro";
+          localStorage.setItem("tema", "claro");
+      }
+      });
+
+      //Contador de Clicks
+
+      const click = ("0")
+
+      document.addEventListener("click" ()
+        click = ("+1")
+    )
+    })
   </script>
 
 </body>
