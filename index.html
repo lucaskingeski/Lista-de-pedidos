@@ -17,7 +17,6 @@
       text-align: center;
       margin-bottom: 20px;
     }
-
     .ingredientes {
       display: flex;
       flex-wrap: wrap;
@@ -116,6 +115,10 @@
 
   <div>
     <button id="toggleTema">Modo Escuro 🌙</button>
+  </div>
+
+  <div>
+    <button id="contador">Cliques:<span id="cliques">0</span></button>
   </div>
 
   <h1>Monte Seu Lanche 🍔</h1>
@@ -240,10 +243,12 @@
 
       //Contador de Clicks
 
-      const click = ("0")
+      let click = 0;
 
-      document.addEventListener("click" ()
-        click = ("+1")
+      document.getElementById("contador").addEventListener("click", () => {
+        click++
+        document.getElementById("cliques").textContent = click;
+      }
     )
     })
   </script>
