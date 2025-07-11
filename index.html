@@ -108,6 +108,31 @@
   .modo-escuro button:hover {
       background: #666;
     }
+  
+  .modo-rosa {
+    background: #642852;
+    color: #ffffff;
+  }
+  .modo-rosa .resultado,
+  .modo-rosa .favorito,
+  .modo-rosa .salvos {
+    background: #6e375e;
+  }
+  .modo-rosa .ingredientes label:hover {
+      background: #773459;
+    }
+    .modo-rosa button {
+      background: #6d368d;
+      color: #ffffff;
+    }
+
+  .modo-rosa button:hover {
+      background: #4d2852;
+    }
+    .modo-rosa .ingredientes label {
+      background: #532755;
+      color: #ffffff;
+    }
 
   </style>
 </head>
@@ -115,6 +140,10 @@
 
   <div>
     <button id="toggleTema">Modo Escuro 🌙</button>
+  </div>
+
+  <div>
+    <button id="toggleTema1">Modo Rosa </button>
   </div>
 
   <div>
@@ -240,6 +269,23 @@
           localStorage.setItem("tema", "claro");
       }
       });
+
+      //ROSAAAAAAAAAAAAAAAAAAAAAAA
+
+      const btnTema1 = document.getElementById("toggleTema1");
+
+      btnTema1.addEventListener("click", () => {
+        document.body.classList.toggle("modo-rosa");
+
+
+      if (document.body.classList.contains("modo-rosa")) {
+        btnTema1.textContent = "Modo Normal";
+        localStorage.setItem("tema", "Rosa");
+      } else {
+        btnTema1.textContent = "Modo Rosa";
+        localStorage.setItem("tema", "Normal");
+      }
+    });
 
       //Contador de Clicks
 
