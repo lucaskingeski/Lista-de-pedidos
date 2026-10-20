@@ -1,0 +1,21 @@
+{
+  "name": "node",
+  "version": "1.0.0",
+  "description": "meu primeiro app com nodeks",
+  "main": "app.js",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "nodejs",
+    "npm",
+    "modulos"
+  ],
+  "author": "Lucas Kingeski Enes",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^5.1.0",
+    "http": "^0.0.1-security"
+  }
+}

@@ -18,27 +18,29 @@ app.set('port', port);
 // Set up mongoose connection
 const mongoose = require("mongoose");
 
-const mongoDB = require("dotenv").config().parsed.MONGO_URI;
+require("dotenv").config();
 
-async function connectMongoose() {
-  await mongoose.connect(mongoDB);
+const mongoDB = process.env.MONGO_URI;
 
-  // Add connection error handlers
-  mongoose.connection.on("error", (err) => {
-    console.error("MongoDB connection error:", err);
-  });
-
-  mongoose.connection.on("disconnected", () => {
-    console.warn("MongoDB disconnected");
-  });
-}
-
-try {
-  connectMongoose();
-} catch (err) {
-  console.error("Failed to connect to MongoDB:", err);
+if (!mongoDB) {
+  console.error("*****************************************");
+  console.error("FATAL ERROR: MONGO_URI is not defined.");
+  console.error("Please set the MONGO_URI environment variable in Railway.");
+  console.error("*****************************************");
   process.exit(1);
 }
+
+async function connectMongoose() {
+  try {
+    await mongoose.connect(mongoDB);
+    console.log("Connected to MongoDB successfully");
+  } catch (err) {
+    console.error("MongoDB connection error:", err);
+    process.exit(1);
+  }
+}
+
+connectMongoose();
 
 /**
  * Create HTTP server.

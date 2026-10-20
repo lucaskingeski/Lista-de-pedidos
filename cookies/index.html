@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+    <body>
+        <h1>The document Object</h1>
+        <h2>The activeElement Property</h2>
+
+        <p>Cookies associated with this document</p>
+        <p id="demo"></p>
+
+        <p id="texto">Welcome </p> 
+
+        <input type="text" id="nome" placeholder="Seu nome">
+        <button onclick="salvar()">Salvar</button>
+
+        <script>
+            document.cookie="username=Lucas; expires=Fri, 31 Dec 2025 23:59:59 GMT; path=/";
+            let allCookies = document.cookie;
+            document.getElementById("demo").innerHTML=allCookies;
+            console.log(document.cookie);
+
+            //salvar nome nos cookies
+
+            function salvar() {
+                const nome = document.getElementById("nome").value;
+                 document.cookie = "nome=" + nome;
+                }
+
+            // substituir eles no site
+
+            DOM.addEventListener('click', ()=>{
+                if (nome){
+                    getElementById=("texto")
+                }
+            })
+        </script>
+    </body>
+</html>
