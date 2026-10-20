@@ -1,0 +1,33 @@
+/* ============================================================================
+   dicionario.js — tentativas válidas de 5 letras (português brasileiro)
+
+   Fonte única de verdade, compartilhada por 01-serena.html, 02-noturno.html
+   e 03-eletrico.html. Antes desta extração, cada arquivo tinha sua própria
+   lista de 14 palavras.
+
+   ARQUIVO GERADO — não edite à mão.
+   Para regerar: node tools/gerar-dicionario.js (a partir da raiz do repositório)
+
+   API
+     window.DICIONARIO_PT5         Set   -> .has(palavra)  busca O(1), use no jogo
+     window.DICIONARIO_PALAVRAS   Array -> todas as tentativas válidas
+     window.DICIONARIO_RESPOSTAS  Array -> subconjunto sorteável (palavra-alvo)
+
+   Por que existem duas listas
+     DICIONARIO_PT5 é largo de propósito: nunca recusar uma palavra que o
+     jogador digitou de propósito. DICIONARIO_RESPOSTAS é estreito e sempre
+     contido em DICIONARIO_PT5: são palavras comuns, sem formas flexionadas,
+     sem nome próprio — boas para virar a palavra-alvo. Uma resposta fora do
+     dicionário de tentativas tornaria a partida impossível de vencer.
+
+   Curadoria (__TOTAL__ entradas em DICIONARIO_PT5)
+     - dicionário oficial de correção do português (LibreOffice/hunspell pt_BR.dic)
+     - léxico multi-dicionários (145 mil entradas, projeto fserb/pt-br)
+     - listas de palavras de Termo em PT-BR (jogo Termo e lista Diceware)
+     - flexões geradas a partir dos lemas: plurais e paradigma verbal
+       (os dicionários guardam só o lema; CASAS, OPINA e ESTÃO são gerados)
+     - normalização: minúsculas, sem acento, apenas A-Z — o teclado do jogo não
+       tem acento, então digitar SERIE ou SERIES equivale à palavra acentuada
+     - exclusões: nomes próprios, termos ofensivos e formas não portuguesas
+       (K, W, Y; mais de três consoantes seguidas; três letras iguais)
+   ========================================================================= */

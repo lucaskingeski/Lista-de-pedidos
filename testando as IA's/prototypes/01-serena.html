@@ -1,0 +1,1264 @@
+﻿<!DOCTYPE html>
+<!-- Especificacao: docs/plans/2026-10-13-adivinha-palavra.md (PRD v3.0).
+     As citacoes "PRD §x" nos comentarios deste arquivo apontam para la.
+     Addendo dos prototipos: docs/plans/2026-10-20-addendo-prototipos-web.md -->
+<html lang="pt-BR" data-contrast="normal" data-motion="auto" data-palette="normal">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="color-scheme" content="light" />
+<title>Adivinha Palavra — protótipo “Serena”</title>
+
+<style>
+/* =========================================================================
+   SERENA — minimalismo calmo e legível
+   Fundo off-white, texto grafite, acento verde-musgo.
+   Prioridades: (1) entender as regras em 3s  (2) jogar com uma mão só
+   (3) nada de ruído visual fora da hierarquia título → grade → teclado → ações.
+   ========================================================================= */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+/* ---------- Tokens ------------------------------------------------------
+   Contraste verificado contra --bg (#FAFAF7, L≈0.966):
+     --ink      14.9:1   --ink-2    6.1:1   --accent    4.7:1
+     branco sobre --accent 4.9:1   --ink sobre âmbar 7.4:1
+   Nenhum texto informacional fica abaixo de 4.5:1. */
+:root{
+  --bg:#FAFAF7;
+  --surface:#FFFFFF;
+  --surface-2:#F3F2EC;
+  --ink:#1C1E21;          /* grafite */
+  --ink-2:#5C6066;        /* secundário — 6.1:1 */
+  --line:#E4E2DA;
+  --line-strong:#C9C6BA;
+  --accent:#4B7B5A;       /* verde-musgo */
+  --accent-ink:#3A6146;   /* musgo escuro para texto sobre --accent-soft: 6.2:1 */
+  --accent-soft:#EDF2EC;
+
+  --c-correct:#4B7B5A; --c-correct-ink:#FFFFFF;
+  --c-present:#D9A441;  --c-present-ink:#1C1E21;
+  --c-absent:#DDDCD4;   --c-absent-ink:#5C6066;
+
+  --r:12px;              /* raio padrão de superfície */
+  --r-sm:10px;           /* células e teclas: um respiro a menos para a grade manter o ritmo */
+  --shell:420px;
+  --gap:5px;
+  --key-h:50px;
+  --font-sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --font-serif:Georgia,"Iowan Old Style","Palatino Linotype","Times New Roman",serif;
+
+  /* Célula quadrada que se adapta: largura disponível e altura da viewport.
+     O teto em vh evita que a grade empurre o teclado para fora da tela em
+     celulares baixos ou em paisagem. */
+  --cell: clamp(46px, min( calc((min(100vw, var(--shell)) - 32px - 20px) / 5), 9.8vh ), 64px);
+}
+
+/* Paleta para daltonismo: azul = correta, laranja = presente.
+   Texto branco sobre o azul = 5.4:1; texto grafite sobre o laranja = 5.6:1. */
+[data-palette="cb"]{
+  --c-correct:#2E6F9E; --c-correct-ink:#FFFFFF;
+  --c-present:#E07A2B; --c-present-ink:#1C1E21;
+}
+
+/* Alto contraste: fundo quase branco, bordas grossas e texto mais escuro.
+   As formas (hachura/anel) deixam de ser sutis. */
+[data-contrast="high"]{
+  --bg:#FFFFFF;
+  --surface:#FFFFFF;
+  --surface-2:#EDEDE8;
+  --ink:#000000;
+  --ink-2:#33363A;
+  --line:#000000;
+  --line-strong:#000000;
+  --accent:#2F5C3E;
+  --accent-soft:#E2EDE5;
+  --c-correct:#1F4D33; --c-correct-ink:#FFFFFF;
+  --c-present:#8A5A00; --c-present-ink:#FFFFFF;
+  --c-absent:#B9B7AE;    --c-absent-ink:#000000;
+}
+[data-contrast="high"][data-palette="cb"]{
+  --c-correct:#12496F; --c-correct-ink:#FFFFFF;
+  --c-present:#A84600;  --c-present-ink:#FFFFFF;
+}
+
+html, body { height:100%; }
+body{
+  margin:0;
+  background:var(--bg);
+  color:var(--ink);
+  font-family:var(--font-sans);
+  font-size:16px;
+  line-height:1.45;
+  -webkit-font-smoothing:antialiased;
+  -webkit-text-size-adjust:100%;
+}
+
+.sr-only{
+  position:absolute; width:1px; height:1px; padding:0; margin:-1px;
+  overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0;
+}
+
+/* ---------- Casca / layout ---------------------------------------------
+   Coluna única, centralizada, com respiro generoso. Em desktop vira um cartão
+   flutuante para que a “página” não pareça uma folha de caderno solta. */
+.app{
+  width:100%;
+  max-width:var(--shell);
+  margin:0 auto;
+  padding:clamp(18px,4.5vh,36px) 16px calc(18px + env(safe-area-inset-bottom));
+  display:flex; flex-direction:column;
+  gap:18px;
+}
+@media (min-width:600px){
+  body{ background:#F2F1EA; padding:32px 16px; }
+  .app{
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:20px;
+    padding:32px 26px 26px;
+    box-shadow:0 1px 2px rgba(28,30,33,.04), 0 12px 32px rgba(28,30,33,.05);
+  }
+}
+
+/* ---------- Cabeçalho --------------------------------------------------- */
+.brand{ text-align:center; }
+.brand h1{
+  font-family:var(--font-serif);
+  font-weight:600;
+  font-size:clamp(27px,7.4vw,32px);
+  line-height:1.1;
+  letter-spacing:-.015em;
+  margin:0;
+}
+.brand h1 .accent{ color:var(--accent); }
+.brand p{
+  margin:6px 0 0;
+  font-size:13.5px;
+  color:var(--ink-2);
+}
+
+/* ---------- Cartão de regras --------------------------------------------
+   É o bloco de “3 segundos”. Fica no topo, inteiro, e se recolhe sozinho
+   depois da primeira tentativa — some da tela quando deixou de ser útil. */
+.rules{
+  background:var(--surface);
+  border:1px solid var(--line);
+  border-radius:var(--r);
+  overflow:hidden;
+}
+.rules-toggle{
+  width:100%; min-height:44px;
+  display:flex; align-items:center; justify-content:space-between; gap:10px;
+  padding:10px 14px;
+  background:none; border:0; cursor:pointer;
+  font:600 13.5px/1 var(--font-sans);
+  color:var(--ink);
+  letter-spacing:.01em;
+  touch-action:manipulation;
+}
+.rules-toggle svg{ width:18px; height:18px; color:var(--ink-2); transition:transform .22s ease; flex:none; }
+.rules[data-open="false"] .rules-toggle svg{ transform:rotate(-90deg); }
+.rules-body{ padding:0 14px 14px; }
+.rules[data-open="false"] .rules-body{ display:none; }
+.legend{ list-style:none; margin:0; padding:0; display:grid; gap:9px; }
+.legend li{ display:flex; align-items:flex-start; gap:10px; font-size:13px; color:var(--ink-2); }
+.legend b{ color:var(--ink); font-weight:600; }
+.sw{
+  flex:none; width:20px; height:20px; border-radius:6px; margin-top:1px;
+  display:inline-block; position:relative;
+}
+/* As amostras reusam exatamente as cores/formas das células — a legenda não
+   pode mentir sobre o que o jogador vai ver. */
+.sw-correct{ background:var(--c-correct); }
+.sw-present{ background:var(--c-present); box-shadow:inset 0 0 0 2px rgba(28,30,33,.28); }
+.sw-absent{
+  background-color:var(--c-absent);
+  background-image:repeating-linear-gradient(45deg, rgba(28,30,33,.14) 0 3px, transparent 3px 8px);
+}
+.rules-note{
+  margin:12px 0 0; padding-top:11px;
+  border-top:1px solid var(--line);
+  font-size:12px; color:var(--ink-2);
+}
+.rules-note kbd{
+  font:600 11px/1 var(--font-sans);
+  background:var(--surface-2); border:1px solid var(--line); border-radius:4px;
+  padding:2px 5px; color:var(--ink);
+}
+
+/* ---------- Grade ------------------------------------------------------- */
+.board{ display:flex; flex-direction:column; align-items:center; gap:14px; }
+.rows{ display:flex; flex-direction:column; gap:var(--gap); }
+.row{ display:flex; gap:var(--gap); }
+
+.cell{
+  width:var(--cell); height:var(--cell);
+  border-radius:var(--r-sm);
+  display:grid; place-items:center;
+  position:relative;
+  background:var(--surface);
+  border:1.5px solid var(--line);
+  color:var(--ink);
+  font-size:clamp(19px, calc(var(--cell) * .46), 29px);
+  font-weight:600;
+  line-height:1;
+  letter-spacing:.02em;
+  transition:background-color .16s ease, border-color .16s ease, color .16s ease, transform .12s ease;
+}
+.cell[data-state="filled"]{ border-color:var(--line-strong); }
+.cell[data-state="correct"]{ background:var(--c-correct); border-color:var(--c-correct); color:var(--c-correct-ink); }
+.cell[data-state="present"]{ background:var(--c-present); border-color:var(--c-present); color:var(--c-present-ink); box-shadow:inset 0 0 0 2px rgba(28,30,33,.28); }
+.cell[data-state="absent"]{
+  background-color:var(--c-absent);
+  background-image:repeating-linear-gradient(45deg, rgba(28,30,33,.13) 0 3px, transparent 3px 8px);
+  border-color:transparent;
+  color:var(--c-absent-ink);
+}
+/* Marca discreta da letra entregue pelo poder Revelar: evita a sensação de
+   “o jogo preencheu sozinho sem me avisar”. */
+.cell[data-revealed="true"]::after{
+  content:""; position:absolute; top:5px; right:5px;
+  width:4px; height:4px; border-radius:50%;
+  background:currentColor; opacity:.55;
+}
+@keyframes pop{ from{ transform:scale(.82); opacity:.35 } to{ transform:scale(1); opacity:1 } }
+.cell.anim{ animation:pop .3s cubic-bezier(.2,.85,.3,1.25) backwards; animation-delay:calc(var(--i,0) * 80ms); }
+.cell.typed{ animation:pop .1s ease-out; }
+@keyframes shake{
+  10%,90%{ transform:translateX(-2px) } 20%,80%{ transform:translateX(4px) }
+  30%,50%,70%{ transform:translateX(-6px) } 40%,60%{ transform:translateX(6px) }
+}
+.row.invalid{ animation:shake .4s ease; }
+[data-contrast="high"] .cell{ border-width:2px; }
+[data-contrast="high"] .cell[data-state="absent"]{
+  background-image:repeating-linear-gradient(45deg, rgba(0,0,0,.22) 0 4px, transparent 4px 9px);
+}
+/* Glifo textual discreto (WCAG 1.4.1): sobrevive a forced-colors, daltonismo,
+   impressão em P&B e leitores de tela que ignoram aria-label em shapes. */
+.glyph{ position:absolute; right:.2rem; top:50%; transform:translateY(-50%); font-size:.65em; line-height:1; pointer-events:none; }
+.cell[data-state="correct"] .glyph{ color:var(--c-correct-ink); }
+.cell[data-state="present"] .glyph{ color:var(--c-present-ink); }
+.cell[data-state="absent"] .glyph{ color:var(--c-absent-ink); }
+.key[data-state="correct"]::after, .key[data-state="present"]::after, .key[data-state="absent"]::after{ content:' '; display:inline-block; width:.4em; height:.4em; border-radius:50%; margin-left:.25em; vertical-align:middle; }
+.key[data-state="correct"]::after{ background:var(--c-correct); }
+.key[data-state="present"]::after{ background:var(--c-present); }
+.key[data-state="absent"]::after{ background:var(--c-absent); }
+
+/* ---------- Status ------------------------------------------------------ */
+.status-col{ text-align:center; }
+#status{ font-size:13px; color:var(--ink-2); min-height:19px; }
+#status.is-good{ color:var(--accent-ink); font-weight:600; }
+kbd-hint{
+  display:none; margin-top:2px;
+  font-size:11px; color:var(--ink-2); opacity:.85;
+}
+/* A dica de atalhos só existe onde existe teclado físico — no celular
+   seria ruído dentro do objetivo de "jogar com uma mão só". */
+@media (hover:hover) and (pointer:fine){
+  .kbd-hint{ display:block; }
+}
+
+/* ---------- Teclado -----------------------------------------------------
+   Altura de 50px garante alvo de toque confortável; a largura é limitada
+   pela linha de 10 teclas (calc. 31px em telas de 360px, com calço de 5px
+   entre teclas — folga suficiente para não errar o alvo). */
+.keyboard{ display:flex; flex-direction:column; gap:8px; user-select:none; -webkit-user-select:none; }
+.krow{ display:flex; gap:var(--gap); }
+.key{
+  flex:1 1 0; min-width:0; height:var(--key-h);
+  border:0; border-radius:var(--r-sm);
+  background:var(--surface);
+  box-shadow:inset 0 0 0 1.5px var(--line);
+  color:var(--ink);
+  font:600 15px/1 var(--font-sans);
+  cursor:pointer;
+  touch-action:manipulation;
+  transition:background-color .14s ease, box-shadow .14s ease, color .14s ease, opacity .14s ease, transform .08s ease;
+}
+.key:active{ transform:translateY(1px); }
+.key[data-state="correct"]{ background:var(--c-correct); box-shadow:inset 0 0 0 1.5px var(--c-correct); color:var(--c-correct-ink); }
+.key[data-state="present"]{ background:var(--c-present); box-shadow:inset 0 0 0 1.5px var(--c-present); color:var(--c-present-ink); }
+.key[data-state="absent"]{
+  background-color:var(--c-absent);
+  background-image:repeating-linear-gradient(45deg, rgba(28,30,33,.13) 0 3px, transparent 3px 8px);
+  box-shadow:none; color:var(--c-absent-ink);
+}
+.key[data-state="eliminated"]{
+  background-color:var(--surface-2);
+  box-shadow:none;
+  color:var(--ink-2); opacity:.45;
+  cursor:not-allowed;
+}
+.key--wide{ flex:1.4 1 0; font-size:13px; }
+.key--ghost{ background:transparent; box-shadow:none; color:var(--ink-2); }
+.key--submit{
+  flex:1.5 1 0; font-size:13px;
+  background:var(--accent); box-shadow:none; color:#FFFFFF;
+}
+.key--submit:disabled{ background:var(--surface-2); color:var(--ink-2); opacity:.5; cursor:not-allowed; }
+[data-contrast="high"] .key{ box-shadow:inset 0 0 0 2px var(--line); }
+[data-contrast="high"] .key[data-state="absent"]{
+  background-image:repeating-linear-gradient(45deg, rgba(0,0,0,.22) 0 4px, transparent 4px 9px);
+}
+
+/* ---------- Poderes ------------------------------------------------------ */
+.powers{ display:flex; gap:10px; justify-content:center; }
+.power{
+  display:inline-flex; align-items:center; gap:7px;
+  min-height:44px; padding:0 18px;
+  border:0; border-radius:999px;
+  background:var(--accent-soft); color:var(--accent-ink);
+  font:600 13.5px/1 var(--font-sans);
+  cursor:pointer; touch-action:manipulation;
+  transition:background-color .15s ease, opacity .15s ease, transform .08s ease;
+}
+.power:active{ transform:translateY(1px); }
+.power:disabled{ opacity:.42; cursor:not-allowed; }
+.power svg{ width:16px; height:16px; flex:none; }
+
+/* ---------- Ações secundárias ------------------------------------------- */
+.secondary{
+  display:flex; align-items:center; justify-content:center; gap:2px;
+  border-top:1px solid var(--line);
+  padding-top:6px; margin-top:2px;
+}
+.ghost{
+  min-height:44px; padding:0 16px;
+  border:0; border-radius:var(--r-sm);
+  background:transparent; color:var(--ink-2);
+  font:500 13px/1 var(--font-sans);
+  cursor:pointer; touch-action:manipulation;
+  transition:background-color .15s ease, color .15s ease;
+}
+.ghost:hover{ background:var(--surface-2); color:var(--ink); }
+.ghost.is-armed{ background:var(--accent-soft); color:var(--accent-ink); font-weight:600; }
+.sep{ color:var(--line-strong); font-size:13px; user-select:none; }
+
+/* ---------- Foco visível ------------------------------------------------- */
+:focus-visible{ outline:2.5px solid var(--accent); outline-offset:2px; border-radius:var(--r-sm); }
+@media (forced-colors:active){ :focus-visible{ outline-color:Highlight; } }
+
+/* ---------- Toasts -------------------------------------------------------
+   Canto inferior, nunca bloqueantes, com aria-live="polite". */
+.toasts{
+  position:fixed; left:50%; transform:translateX(-50%);
+  bottom:calc(16px + env(safe-area-inset-bottom));
+  display:flex; flex-direction:column; gap:8px; align-items:center;
+  width:max-content; max-width:min(92vw, 380px);
+  pointer-events:none; z-index:60;
+}
+.toast{
+  background:var(--ink); color:#FAFAF7;
+  padding:9px 15px; border-radius:999px;
+  font-size:12.5px; line-height:1.35; text-align:center;
+  box-shadow:0 6px 18px rgba(28,30,33,.18);
+  animation:toastIn .18s ease-out;
+}
+.toast.out{ animation:toastOut .2s ease-in forwards; }
+@keyframes toastIn{ from{ opacity:0; transform:translateY(8px) } to{ opacity:1; transform:none } }
+@keyframes toastOut{ to{ opacity:0; transform:translateY(6px) } }
+
+/* ---------- Diálogos (resultado / configurações) ------------------------ */
+dialog{
+  border:0; padding:0; margin:auto;
+  background:transparent;
+  max-width:min(92vw, 384px); width:100%;
+  color:var(--ink);
+}
+dialog::backdrop{ background:rgba(28,30,33,.44); }
+.sheet{
+  background:var(--surface);
+  border:1px solid var(--line);
+  border-radius:var(--r);
+  padding:24px 22px 20px;
+  box-shadow:0 20px 50px rgba(28,30,33,.18);
+  animation:sheetIn .2s ease-out;
+}
+@keyframes sheetIn{ from{ opacity:0; transform:translateY(10px) scale(.99) } to{ opacity:1; transform:none } }
+.eyebrow{
+  font:600 11px/1 var(--font-sans); letter-spacing:.1em; text-transform:uppercase;
+  color:var(--accent-ink); margin:0 0 8px;
+}
+.sheet-title{ font-family:var(--font-serif); font-size:23px; font-weight:600; margin:0; letter-spacing:-.01em; }
+.sheet-sub{ margin:8px 0 0; font-size:13px; color:var(--ink-2); }
+.result-word{
+  margin:14px 0 0; font-family:var(--font-serif);
+  font-size:clamp(34px,10vw,42px); font-weight:600; letter-spacing:.1em;
+  color:var(--accent-ink);
+}
+.result-meta{ margin:6px 0 0; font-size:13px; color:var(--ink-2); }
+.share-box{
+  margin:16px 0 0;
+  width:100%; resize:none;
+  font:13px/1.55 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  color:var(--ink);
+  background:var(--surface-2);
+  border:1px solid var(--line); border-radius:var(--r-sm);
+  padding:12px 13px;
+}
+.share-note{ margin:8px 0 0; font-size:11.5px; color:var(--ink-2); }
+.sheet-actions{ display:flex; gap:10px; margin-top:18px; }
+.btn-primary{
+  flex:1 1 auto; min-height:46px; padding:0 18px;
+  border:0; border-radius:var(--r-sm);
+  background:var(--accent); color:#FFFFFF;
+  font:600 14px/1 var(--font-sans);
+  display:inline-flex; align-items:center; justify-content:center; gap:8px;
+  cursor:pointer; touch-action:manipulation;
+}
+.btn-primary svg{ width:16px; height:16px; }
+.btn-quiet{
+  min-height:46px; padding:0 16px;
+  border:1.5px solid var(--line); border-radius:var(--r-sm);
+  background:transparent; color:var(--ink);
+  font:600 14px/1 var(--font-sans);
+  cursor:pointer; touch-action:manipulation;
+}
+.btn-quiet:hover{ background:var(--surface-2); }
+
+/* ---------- Configurações ----------------------------------------------- */
+.settings-list{ list-style:none; margin:16px 0 0; padding:0; display:grid; gap:6px; }
+.switch{
+  width:100%; min-height:48px;
+  display:flex; align-items:center; justify-content:space-between; gap:14px;
+  padding:9px 12px;
+  background:transparent; border:1px solid transparent; border-radius:var(--r-sm);
+  text-align:left; cursor:pointer; touch-action:manipulation;
+}
+.switch:hover{ background:var(--surface-2); }
+.switch-text b{ display:block; font:600 13.5px/1.3 var(--font-sans); color:var(--ink); }
+.switch-text i{ display:block; font-style:normal; font-size:11.5px; color:var(--ink-2); margin-top:2px; }
+.switch-track{
+  flex:none; width:42px; height:25px; border-radius:999px;
+  background:var(--line); position:relative;
+  transition:background-color .18s ease;
+}
+.switch-thumb{
+  position:absolute; top:3px; left:3px; width:19px; height:19px; border-radius:50%;
+  background:#FFFFFF; box-shadow:0 1px 2px rgba(28,30,33,.25);
+  transition:transform .18s ease;
+}
+.switch[aria-checked="true"] .switch-track{ background:var(--accent); }
+.switch[aria-checked="true"] .switch-thumb{ transform:translateX(17px); }
+
+/* ---------- Movimento reduzido ------------------------------------------
+   Preferência do sistema + toggle manual (data-motion="off"). */
+@media (prefers-reduced-motion:reduce){
+  *, *::before, *::after{
+    animation-duration:.001ms !important; animation-iteration-count:1 !important;
+    transition-duration:.001ms !important; scroll-behavior:auto !important;
+  }
+}
+html[data-motion="off"] *,
+html[data-motion="off"] *::before,
+html[data-motion="off"] *::after{
+  animation-duration:.001ms !important; animation-iteration-count:1 !important;
+  transition-duration:.001ms !important;
+}
+
+/* Telas baixas: aperta os vãos verticais para manter teclado + poderes visíveis. */
+@media (max-height:680px){
+  .app{ gap:12px; padding-top:16px; }
+  :root{ --key-h:46px; }
+}
+@media (max-height:600px){
+  :root{ --cell:clamp(40px, 8.6vh, 52px); }
+  .brand p{ display:none; }
+}
+</style>
+</head>
+
+<body>
+<main class="app" id="app">
+
+  <!-- 1. TÍTULO — serifado, uma frase diz o jogo inteiro. -->
+  <header class="brand">
+    <h1>Adivinha <span class="accent">Palavra</span></h1>
+    <p>6 tentativas. 5 letras. Nova palavra a cada partida.</p>
+  </header>
+
+  <!-- 2. REGRAS — lidas antes de qualquer interação, some depois. -->
+  <section class="rules" id="rules" data-open="true" aria-labelledby="rulesTitle">
+    <button class="rules-toggle" id="rulesToggle" aria-expanded="true" aria-controls="rulesBody">
+      <span id="rulesTitle">Como jogar</span>
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <div class="rules-body" id="rulesBody">
+      <ul class="legend">
+        <li><span class="sw sw-correct" aria-hidden="true"></span><span><b>Certa</b> — a letra está no lugar certo.</span></li>
+        <li><span class="sw sw-present" aria-hidden="true"></span><span><b>Presente</b> — a letra existe, mas está fora de posição.</span></li>
+        <li><span class="sw sw-absent" aria-hidden="true"></span><span><b>Ausente</b> — a letra não existe na palavra.</span></li>
+      </ul>
+      <p class="rules-note">
+        Letras repetidas contam de verdade: cada verde “gasta” uma ocorrência.
+        Teclado do celular ou do computador: <kbd>Enter</kbd> envia · <kbd>⌫</kbd> apaga.
+      </p>
+    </div>
+  </section>
+
+  <!-- 3. GRADE + TECLADO + PODERES -->
+  <div class="board">
+    <div class="rows" id="rows" role="grid" aria-label="Sua palavra: 6 linhas de 5 letras"></div>
+
+    <div class="status-col">
+      <p id="status" role="status" aria-live="polite"></p>
+      <span class="kbd-hint" aria-hidden="true">Enter envia · ⌫ apaga · Alt+R / Alt+K poderes</span>
+    </div>
+
+    <div class="keyboard" id="keyboard" role="group" aria-label="Teclado de letras"></div>
+
+    <div class="powers">
+      <button class="power" id="powerReveal" type="button">
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M2 12s3.7-6.5 10-6.5S22 12 22 12s-3.7 6.5-10 6.5S2 12 2 12Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><circle cx="12" cy="12" r="2.6" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>
+        Revelar
+      </button>
+      <button class="power" id="powerEliminate" type="button">
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="7.2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M7.4 16.6 16.6 7.4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        Eliminar
+      </button>
+    </div>
+  </div>
+
+  <!-- 4. AÇÕES SECUNDÁRIAS — pequenas, calmas, fora da hierarquia principal. -->
+  <footer class="secondary">
+    <button class="ghost" id="btnRestart" type="button">Reiniciar</button>
+    <span class="sep" aria-hidden="true">·</span>
+    <button class="ghost" id="btnSettings" type="button">Configurações</button>
+  </footer>
+</main>
+
+<!-- Toasts: nunca bloqueiam, apenas informam. -->
+<div class="toasts" id="toasts" aria-live="polite" aria-atomic="false"></div>
+
+<!-- Resultado -->
+<dialog id="dlgResult" aria-labelledby="resTitle">
+  <div class="sheet">
+    <p class="eyebrow" id="resEyebrow">Vitória</p>
+    <h2 class="sheet-title" id="resTitle">Você descobriu a palavra</h2>
+    <p class="result-word" id="resWord">TERMO</p>
+    <p class="result-meta" id="resMeta">em 3 de 6 tentativas · 1min 12s</p>
+
+    <label class="sr-only" for="shareText">Resumo para compartilhar (não revela a palavra)</label>
+    <textarea class="share-box" id="shareText" rows="7" readonly spellcheck="false"></textarea>
+    <p class="share-note">Sem spoiler: só cores. Copie manualmente se preferir.</p>
+
+    <div class="sheet-actions">
+      <button class="btn-primary" id="btnShare" type="button" data-autofocus>
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 15V3m0 0L8 7m4-4 4 4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>
+        Compartilhar
+      </button>
+      <button class="btn-quiet" id="btnPlayAgain" type="button">Reiniciar</button>
+    </div>
+  </div>
+</dialog>
+
+<!-- Configurações -->
+<dialog id="dlgSettings" aria-labelledby="setTitle">
+  <div class="sheet">
+    <h2 class="sheet-title" id="setTitle">Configurações</h2>
+    <p class="sheet-sub">Ajustes de leitura e cor. Não afetam a partida em andamento.</p>
+
+    <ul class="settings-list">
+      <li>
+        <button class="switch" id="setContrast" role="switch" aria-checked="false" type="button">
+          <span class="switch-text"><b>Alto contraste</b><i>Bordas e hachuras reforçadas</i></span>
+          <span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span>
+        </button>
+      </li>
+      <li>
+        <button class="switch" id="setPalette" role="switch" aria-checked="false" type="button">
+          <span class="switch-text"><b>Cores para daltonismo</b><i>Azul = certa · laranja = presente</i></span>
+          <span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span>
+        </button>
+      </li>
+      <li>
+        <button class="switch" id="setMotion" role="switch" aria-checked="false" type="button">
+          <span class="switch-text"><b>Reduzir animações</b><i>Sem tremor, Cascata ou efeitos</i></span>
+          <span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span>
+        </button>
+      </li>
+    </ul>
+
+    <p class="share-note">Atalhos no computador: <b>Alt+R</b> Revelar · <b>Alt+K</b> Eliminar · <b>Enter</b> enviar.</p>
+
+    <div class="sheet-actions">
+      <button class="btn-primary" id="btnCloseSettings" type="button" data-autofocus>Feito</button>
+    </div>
+  </div>
+</dialog>
+
+<!-- Dicionário compartilhado entre os protótipos: fonte única de verdade,
+     curada com ~14,5 mil palavras portuguesas de 5 letras. Mantenha este
+     arquivo ao lado do HTML — sem ele o jogo cai na lista mínima de fallback. -->
+<script src="dicionario.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  /* =======================================================================
+     DOMÍNÓRIO — 100% puro, separado da UI (mesma separação do PRD, §11).
+     ======================================================================= */
+  var TARGET   = 'TERMO';
+  var LEN      = 5;
+  var MAX      = 6;
+  /* Lista de tentativas válidas: dicionario.js é a fonte única dos três
+     protótipos (~14,5 mil palavras de 5 letras). O fallback mantém o jogo
+     funcionando caso o HTML seja aberto sem o dicionario.js ao lado. */
+  var FALLBACK = ['CRANE','STARE','ADIEU','RAISE','SLATE','TERMO','MENTE',
+                  'PEDRA','NUVEM','FLORE','BARCO','CASAS','TROCA','NOTAS'];
+  var ACCEPTED = (window.DICIONARIO_PT5 && window.DICIONARIO_PT5.size > 1000)
+                 ? window.DICIONARIO_PT5
+                 : new Set(FALLBACK);
+  var ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+
+  /* Palavra-alvo: sai do subconjunto curado do dicionário compartilhado
+     (~1,7 mil palavras comuns) e é sorteada a cada reinício. `ultimoAlvo`
+     impede repetir a palavra da partida anterior — quem pede "reiniciar"
+     espera outra palavra, não a mesma. */
+  var RESPOSTAS = (window.DICIONARIO_RESPOSTAS && window.DICIONARIO_RESPOSTAS.length)
+                  ? window.DICIONARIO_RESPOSTAS : FALLBACK;
+  var ultimoAlvo = null;
+  function sortearAlvo() {
+    if (RESPOSTAS.length < 2) return RESPOSTAS[0] || 'TERMO';
+    var novo;
+    do {
+      novo = RESPOSTAS[Math.floor(Math.random() * RESPOSTAS.length)];
+    } while (novo === ultimoAlvo);
+    ultimoAlvo = novo;
+    return novo;
+  }
+
+  /**
+   * Avaliação em 2 passos (Wordle correto) — resolve letras repetidas.
+   * 1)Marca todas as posições corretas e consome a ocorrência do contador.
+   * 2) Só depois marca "presentes", usando o que sobrou no contador.
+   *
+   * Exemplos (mesma saída do Wordle clássico):
+   *   CRANE / TERMO -> absent, present, absent, absent, present
+   *     (o "E" final existe em TERMO, na posição 2)
+   *   MENTE / TERMO -> present, correct, absent, present, absent
+   *     (o "E" verde consome a única ocorrência de E, então o segundo E é
+   *      ausente; já o "T" e o "M" viram amarelos em posições trocadas)
+   */
+  function evaluate(guess, target) {
+    var res = [], pool = {}, i, ch;
+    for (i = 0; i < guess.length; i++) res.push('absent');
+    for (i = 0; i < target.length; i++) { ch = target[i]; pool[ch] = (pool[ch] || 0) + 1; }
+    for (i = 0; i < guess.length; i++) {
+      if (guess[i] === target[i]) { res[i] = 'correct'; pool[guess[i]]--; }
+    }
+    for (i = 0; i < guess.length; i++) {
+      if (res[i] === 'correct') continue;
+      ch = guess[i];
+      if (pool[ch] > 0) { res[i] = 'present'; pool[ch]--; }
+    }
+    return res;
+  }
+
+  // Vetores de teste executados no console (evidência de que o algoritmo fecha).
+  (function selfTest() {
+    var cases = [
+      ['CRANE', ['absent', 'present', 'absent', 'absent', 'present']],
+      ['MENTE', ['present', 'correct', 'absent', 'present', 'absent']],
+      ['TERMO', ['correct', 'correct', 'correct', 'correct', 'correct']],
+      // NUVEM: só E e M existem no alvo — ambos fora de posição.
+      ['NUVEM', ['absent', 'absent', 'absent', 'present', 'present']]
+    ];
+    var ok = cases.every(function (c) { return evaluate(c[0], 'TERMO').join() === c[1].join(); });
+    if (!ok) console.warn('[Adivinha Palavra] self-test de avaliação falhou.');
+  })();
+
+  var RANK = { absent: 1, present: 2, correct: 3 };
+  var EMOJI = { correct: '🟩', present: '🟨', absent: '⬜' };
+  var STATE_LABEL = {
+    empty: 'vazio', filled: 'preenchida', correct: 'correta',
+    present: 'presente, fora de posição', absent: 'ausente'
+  };
+
+  /* =======================================================================
+     ESTADO
+     ======================================================================= */
+  var state = {
+    current: newArray(LEN),
+    locked:  newArray(LEN).fill(false),
+    history: [],
+    row: 0,
+    status: 'playing',
+    powers: { reveal: true, eliminate: true },
+    startedAt: Date.now(),
+    finishedAt: null
+  };
+
+  function newArray(n) { return new Array(n).fill(null); }
+
+  /* =======================================================================
+     ELEMENTOS
+     ======================================================================= */
+  var $ = function (id) { return document.getElementById(id); };
+  var elRows    = $('rows'), elKeyboard = $('keyboard'), elToasts = $('toasts');
+  var elStatus  = $('status'), elRules = $('rules'), elRulesToggle = $('rulesToggle');
+  var dlgResult = $('dlgResult'), dlgSettings = $('dlgSettings');
+
+  var cellRefs = [];   // cellRefs[row][col]
+  var rowRefs  = [];
+  var keyRefs  = {};   // letra -> botão
+
+  /* =======================================================================
+     CONSTRUÇÃO
+     ======================================================================= */
+  function buildGrid() {
+    var frag = document.createDocumentFragment();
+    for (var r = 0; r < MAX; r++) {
+      var rowEl = document.createElement('div');
+      rowEl.className = 'row';
+      rowEl.setAttribute('role', 'row');
+      rowEl.setAttribute('aria-rowindex', String(r + 1));
+      rowRefs.push(rowEl);
+      cellRefs.push([]);
+
+      for (var c = 0; c < LEN; c++) {
+        var cell = document.createElement('div');
+        cell.className = 'cell';
+        cell.setAttribute('role', 'gridcell');
+        cell.dataset.state = 'empty';
+        cell.dataset.col = String(c);
+        cell.setAttribute('aria-label', 'posição ' + (c + 1) + ', vazio');
+        rowEl.appendChild(cell);
+        cellRefs[r].push(cell);
+      }
+      frag.appendChild(rowEl);
+    }
+    elRows.appendChild(frag);
+  }
+
+  function buildKeyboard() {
+    var rows = [
+      { keys: 'QWERTYUIOP'.split(''), mod: null },
+      { keys: 'ASDFGHJKL'.split(''), mod: null },
+      { keys: ['BACK', 'Z', 'X', 'C', 'V', 'B', 'N', 'M'], mod: 'SUBMIT' }
+    ];
+
+    rows.forEach(function (row) {
+      var rowEl = document.createElement('div');
+      rowEl.className = 'krow';
+
+      row.keys.forEach(function (k) {
+        var btn;
+        if (k === 'BACK') {
+          btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'key key--ghost';
+          btn.dataset.act = 'back';
+          btn.setAttribute('aria-label', 'Apagar a última letra');
+          btn.innerHTML = svg('<path d="M20 6H9.5L3.5 12l6 6H20a1 1 0 0 0 1-1V7a1 1 0 0 0-1-1Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="m13 10-4 4m0-4 4 4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>');
+        } else {
+          btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'key';
+          btn.textContent = k;
+          btn.setAttribute('aria-label', k);
+          keyRefs[k] = btn;
+        }
+        btn.addEventListener('click', function (e) {
+          if (btn.disabled) return;
+          // detail === 0 → clique vindo do teclado físico: mantém o foco.
+          if (e.detail > 0) btn.blur();
+          if (btn.dataset.act === 'back') backspace();
+          else typeLetter(btn.textContent);
+        });
+        rowEl.appendChild(btn);
+      });
+
+      if (row.mod === 'SUBMIT') {
+        var submit = document.createElement('button');
+        submit.type = 'button';
+        submit.className = 'key key--submit';
+        submit.id = 'keySubmit';
+        submit.textContent = 'Enviar';
+        submit.setAttribute('aria-label', 'Enviar tentativa');
+        submit.addEventListener('click', function (e) {
+          if (submit.disabled) return;
+          if (e.detail > 0) submit.blur();
+          submitGuess();
+        });
+        rowEl.appendChild(submit);
+      }
+
+      elKeyboard.appendChild(rowEl);
+    });
+  }
+
+  function svg(inner) {
+    return '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">' + inner + '</svg>';
+  }
+
+  /* =======================================================================
+     RENDER
+     ======================================================================= */
+  function renderCurrentRow(animateTyped) {
+    var cells = cellRefs[state.row];
+    if (!cells) return;
+    for (var i = 0; i < LEN; i++) {
+      var cell = cells[i];
+      var ch = state.current[i];
+      var st = ch === null ? 'empty' : 'filled';
+      var changed = cell.dataset.state !== st || cell.textContent !== (ch || '');
+      cell.dataset.state = st;
+      cell.textContent = ch || '';
+      cell.setAttribute('aria-label', 'posição ' + (i + 1) + ', ' + (ch ? 'letra ' + ch + ', ' : '') + STATE_LABEL[st]);
+      cell.dataset.revealed = String(state.locked[i]);
+      if (animateTyped && changed && st === 'filled') {
+        cell.classList.remove('typed'); void cell.offsetWidth; cell.classList.add('typed');
+      }
+    }
+    $('keySubmit').disabled = state.current.indexOf(null) !== -1;
+  }
+
+  var GLYPH = { correct:'✓', present:'~', absent:'✕' };
+  function commitRow(word, feedback, animate) {
+    var cells = cellRefs[state.row];
+    for (var i = 0; i < LEN; i++) {
+      var cell = cells[i];
+      cell.classList.remove('typed', 'anim');
+      var g = cell.querySelector('.glyph');
+      if (g) cell.removeChild(g);
+      cell.textContent = word[i];
+      cell.dataset.state = feedback[i];
+      cell.setAttribute('aria-label', 'posição ' + (i + 1) + ', letra ' + word[i] + ', ' + STATE_LABEL[feedback[i]]);
+      if (feedback[i] !== 'empty' && feedback[i] !== 'filled') {
+        var sp = document.createElement('span');
+        sp.className = 'glyph';
+        sp.textContent = GLYPH[feedback[i]];
+        cell.appendChild(sp);
+      }
+      if (animate) { cell.style.setProperty('--i', i); cell.classList.add('anim'); }
+    }
+  }
+
+  // Monotônico: correct > present > absent. Nunca regride.
+  function updateKey(ch, newState) {
+    var btn = keyRefs[ch];
+    if (!btn || btn.dataset.act) return;
+    var cur = btn.dataset.state || 'empty';
+    if (cur !== 'empty' && cur !== 'eliminated' && RANK[newState] <= RANK[cur]) return;
+    if (cur === 'eliminated') return; // letra desativada pelo poder não volta
+    btn.dataset.state = newState;
+    btn.setAttribute('aria-label', ch + ', ' + STATE_LABEL[newState]);
+    if (newState !== 'empty' && newState !== 'eliminated') {
+      var existing = btn.querySelector('.key-glyph');
+      if (existing) btn.removeChild(existing);
+      var sp = document.createElement('span');
+      sp.className = 'key-glyph';
+      sp.textContent = GLYPH[newState];
+      btn.appendChild(sp);
+    }
+  }
+
+  function applyFeedbackToKeys(word, feedback) {
+    for (var i = 0; i < LEN; i++) updateKey(word[i], feedback[i]);
+  }
+
+  function renderPowers() {
+    var rev = $('powerReveal'), eli = $('powerEliminate');
+    rev.disabled = !state.powers.reveal || state.status !== 'playing';
+    eli.disabled = !state.powers.eliminate || state.status !== 'playing';
+    rev.setAttribute('aria-label', state.powers.reveal ? 'Revelar: mostra a letra da próxima posição' : 'Revelar já utilizado');
+    eli.setAttribute('aria-label', state.powers.eliminate ? 'Eliminar: desativa até 2 letras ausentes' : 'Eliminar já utilizado');
+  }
+
+  function renderStatus(msg, good) {
+    elStatus.textContent = msg || '';
+    elStatus.classList.toggle('is-good', !!good);
+  }
+
+  /* =======================================================================
+     ENTRADA
+     ======================================================================= */
+  function typeLetter(ch) {
+    if (state.status !== 'playing') return;
+    if (keyRefs[ch] && keyRefs[ch].dataset.state === 'eliminated') {
+      toast(ch + ' foi eliminada.');
+      return;
+    }
+    // Linha cheia: nada acontece. O envio é sempre explícito (Enviar ou Enter),
+    // igual no toque e no teclado físico — sem “gasto acidental” de tentativa.
+    var i = state.current.indexOf(null);
+    if (i === -1) return;
+    state.current[i] = ch;
+    renderCurrentRow(true);
+    setStatusLive();
+  }
+
+  function backspace() {
+    if (state.status !== 'playing') return;
+    // Apaga a última letra realmente ocupada. Se a linha estiver cheia,
+    // indexOf(null) daria -1 — daí percorrer de trás para frente, pulando
+    // posições vazias e as posições travadas pelo poder Revelar.
+    var i = LEN - 1;
+    while (i >= 0 && (state.current[i] === null || state.locked[i])) i--;
+    if (i < 0) return;
+    state.current[i] = null;
+    renderCurrentRow(false);
+  }
+
+  function setStatusLive() {
+    var left = MAX - state.row;
+    renderStatus(left + (left === 1 ? ' tentativa restante.' : ' tentativas restantes.'));
+  }
+
+  function shake() {
+    var rowEl = rowRefs[state.row];
+    if (!rowEl) return;
+    rowEl.classList.remove('invalid'); void rowEl.offsetWidth; rowEl.classList.add('invalid');
+  }
+
+  /* =======================================================================
+     ENVIAR
+     ======================================================================= */
+  function submitGuess() {
+    if (state.status !== 'playing') return;
+    var word = state.current.join('');
+
+    if (state.current.indexOf(null) !== -1) {
+      shake(); toast('Preencha as 5 letras.'); return;
+    }
+    if (!ACCEPTED.has(word)) {
+      // Não avança: a tentativa inválida não custa nada (regra do PRD §3.1).
+      shake();
+      toast('“' + word + '” não está no dicionário.');
+      return;
+    }
+
+    var feedback = evaluate(word, TARGET);
+    state.history.push({ word: word, feedback: feedback });
+    commitRow(word, feedback, true);
+    applyFeedbackToKeys(word, feedback);
+
+    var correctCount = feedback.filter(function (s) { return s === 'correct'; }).length;
+
+    if (word === TARGET)      return endGame('won');
+    if (state.row + 1 >= MAX) return endGame('lost');
+
+    state.row++;
+    state.current = newArray(LEN);
+    state.locked = newArray(LEN).fill(false);
+    renderCurrentRow(false);
+    renderPowers();
+    closeRules();
+
+    var left = MAX - state.row;
+    renderStatus(
+      (left === 1 ? 'Última tentativa. ' : '') +
+      (correctCount > 0 ? correctCount + (correctCount === 1 ? ' letra no lugar certo.' : ' letras no lugar certo.')
+                        : left + (left === 1 ? ' tentativa restante.' : ' tentativas restantes.')),
+      correctCount > 0
+    );
+  }
+
+  /* =======================================================================
+     PODERES
+     ======================================================================= */
+  function useReveal() {
+    if (state.status !== 'playing') return;
+    if (!state.powers.reveal) { toast('Revelar já foi usado nesta partida.'); return; }
+
+    var i = -1;
+    for (var k = 0; k < LEN; k++) { if (!state.locked[k]) { i = k; break; } }
+    if (i === -1) { toast('Todas as posições já são conhecidas.'); return; }
+
+    state.powers.reveal = false;
+    state.current[i] = TARGET[i];
+    state.locked[i] = true;
+    renderCurrentRow(true);
+    renderPowers();
+    // Revelar a letra e a posição: o jogador sabe exatamente o que ganhou.
+    toast('Revelar: posição ' + (i + 1) + ' é ' + TARGET[i] + '.');
+  }
+
+  function useEliminate() {
+    if (state.status !== 'playing') return;
+    if (!state.powers.eliminate) { toast('Eliminar já foi usado nesta partida.'); return; }
+
+    var pool = ALPHABET.filter(function (ch) {
+      return TARGET.indexOf(ch) === -1 && keyRefs[ch].dataset.state !== 'absent';
+    });
+    if (pool.length === 0) { toast('Não há letras ausentes para eliminar.'); return; }
+
+    // Prioriza o que o jogador já digitou: elimina o erro mais provável primeiro.
+    var typed = pool.filter(function (ch) { return state.current.indexOf(ch) !== -1; });
+    var rest  = pool.filter(function (ch) { return typed.indexOf(ch) === -1; });
+    var picks = typed.concat(rest).slice(0, 2);
+
+    state.powers.eliminate = false;
+    // Tecla realmente desabilitada: sai da ordem de tabulação e some do foco.
+    picks.forEach(function (ch) {
+      var btn = keyRefs[ch];
+      btn.dataset.state = 'eliminated';
+      btn.disabled = true;
+      btn.setAttribute('aria-label', ch + ', eliminada');
+    });
+
+    // Se a letra eliminada estava na linha atual, limpa a célula para não
+    // deixar uma letra “impossível” pendurada na grade.
+    picks.forEach(function (ch) {
+      var idx = state.current.indexOf(ch);
+      if (idx !== -1 && !state.locked[idx]) { state.current[idx] = null; }
+    });
+    renderCurrentRow(false);
+    renderPowers();
+    toast('Eliminada' + (picks.length > 1 ? 's' : '') + ': ' + picks.join(' e ') + '.');
+  }
+
+  /* =======================================================================
+     FIM DE JOGO
+     ======================================================================= */
+  function endGame(status) {
+    state.status = status;
+    state.finishedAt = Date.now();
+    renderPowers();
+
+    var used = state.history.length;
+    var secs = Math.max(0, Math.round((state.finishedAt - state.startedAt) / 1000));
+    var mm = Math.floor(secs / 60), ss = secs % 60;
+
+    if (status === 'won') {
+      renderStatus('Você descobriu a palavra!', true);
+      $('resEyebrow').textContent = 'Vitória';
+      $('resTitle').textContent = 'Boa, você acertou';
+    } else {
+      // Derrota: a palavra é revelada — esconder seria crueldade e inútil.
+      renderStatus('Fim das tentativas.', false);
+      $('resEyebrow').textContent = 'Fim de jogo';
+      $('resTitle').textContent = 'A palavra era';
+    }
+    $('resWord').textContent = TARGET;
+    $('resMeta').textContent = used + ' de ' + MAX + ' tentativas · ' + mm + 'min ' + (ss < 10 ? '0' : '') + ss + 's';
+    $('shareText').value = buildShareText();
+
+    openDialog(dlgResult);
+    closeRules();
+  }
+
+  // Compartilhamento SEM SPOILER: apenas emojis, nunca as letras.
+  function buildShareText() {
+    var used = state.history.length;
+    var head = state.status === 'lost' ? 'X/' + MAX : used + '/' + MAX;
+    var lines = state.history.map(function (h) {
+      return h.feedback.map(function (s) { return EMOJI[s]; }).join('');
+    });
+    return ['Adivinha Palavra #1 · ' + head, '']
+      .concat(lines)
+      .concat(['', '🟩 certa · 🟨 presente · ⬜ ausente'])
+      .join('\n');
+  }
+
+  function copyShare() {
+    var text = $('shareText').value;
+    var done = function () { toast('Resultado copiado. Boa sorte pra quem receber!'); };
+    var fail = function () {
+      $('shareText').focus();
+      $('shareText').select();
+      toast('Não consegui copiar automaticamente — o texto está selecionado.');
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, fail);
+    } else { fail(); }
+  }
+
+  /* =======================================================================
+     REGRAS — recolhimento
+     ======================================================================= */
+  function setRules(open) {
+    elRules.dataset.open = String(open);
+    elRulesToggle.setAttribute('aria-expanded', String(open));
+  }
+  function closeRules() { setRules(false); }
+  elRulesToggle.addEventListener('click', function () {
+    setRules(elRules.dataset.open !== 'true');
+  });
+
+  /* =======================================================================
+     TOASTS
+     ======================================================================= */
+  function toast(msg) {
+    var t = document.createElement('div');
+    t.className = 'toast';
+    t.textContent = msg;
+    elToasts.appendChild(t);
+    while (elToasts.children.length > 3) elToasts.removeChild(elToasts.firstChild);
+    setTimeout(function () {
+      t.classList.add('out');
+      setTimeout(function () { if (t.parentNode) t.parentNode.removeChild(t); }, 220);
+    }, 2800);
+  }
+
+  /* =======================================================================
+     DIÁLOGOS
+     ======================================================================= */
+  var lastFocus = null;
+  function openDialog(dlg) {
+    lastFocus = document.activeElement;
+    if (dlg.showModal) dlg.showModal();
+    else dlg.setAttribute('open', '');
+    var target = dlg.querySelector('[data-autofocus]') || dlg.querySelector('button');
+    if (target) target.focus();
+  }
+  function closeDialog(dlg) {
+    if (dlg.close) dlg.close(); else dlg.removeAttribute('open');
+    if (lastFocus && lastFocus.focus) lastFocus.focus();
+  }
+  [dlgResult, dlgSettings].forEach(function (dlg) {
+    dlg.addEventListener('click', function (e) { if (e.target === dlg) closeDialog(dlg); });
+  });
+  $('btnPlayAgain').addEventListener('click', function () { closeDialog(dlgResult); reset(); });
+  $('btnShare').addEventListener('click', copyShare);
+  $('btnCloseSettings').addEventListener('click', function () { closeDialog(dlgSettings); });
+
+  /* =======================================================================
+     REINICIAR — toque duplo quando há progresso
+     Botão pequeno e destrutivo não deve custar a partida num toque acidental.
+     ======================================================================= */
+  var btnRestart = $('btnRestart'), armed = false, armTimer = null;
+
+  function disarm() {
+    armed = false;
+    btnRestart.classList.remove('is-armed');
+    btnRestart.textContent = 'Reiniciar';
+    clearTimeout(armTimer);
+  }
+  function hasProgress() {
+    return state.history.length > 0 || state.current.some(function (c) { return c !== null; });
+  }
+  btnRestart.addEventListener('click', function () {
+    if (!hasProgress()) { reset(); return; }
+    if (armed) { disarm(); reset(); return; }
+    armed = true;
+    btnRestart.classList.add('is-armed');
+    btnRestart.textContent = 'Confirmar?';
+    toast('Toque em “Confirmar?” para reiniciar.');
+    armTimer = setTimeout(disarm, 4000);
+  });
+
+  function reset() {
+    TARGET = sortearAlvo();
+    state.current = newArray(LEN);
+    state.locked = newArray(LEN).fill(false);
+    state.history = [];
+    state.row = 0;
+    state.status = 'playing';
+    state.powers = { reveal: true, eliminate: true };
+    state.startedAt = Date.now();
+    state.finishedAt = null;
+
+    // Limpa células e teclado de volta ao estado inicial.
+    cellRefs.forEach(function (row) {
+      row.forEach(function (cell) {
+        cell.classList.remove('typed', 'anim', 'invalid');
+        cell.textContent = '';
+        cell.dataset.state = 'empty';
+        cell.dataset.revealed = 'false';
+        cell.setAttribute('aria-label', 'posição ' + (Number(cell.dataset.col) + 1) + ', vazio');
+      });
+    });
+    rowRefs.forEach(function (r) { r.classList.remove('invalid'); });
+    ALPHABET.forEach(function (ch) {
+      var b = keyRefs[ch];
+      b.dataset.state = 'empty';
+      b.disabled = false;
+      b.setAttribute('aria-label', ch);
+    });
+
+    renderCurrentRow(false);
+    renderPowers();
+    renderStatus('6 tentativas restantes.');
+    setRules(true);
+    toast('Partida reiniciada: nova palavra sorteada.');
+  }
+
+  /* =======================================================================
+     CONFIGURAÇÕES (persistidas em localStorage, chave do PRD §9)
+     ======================================================================= */
+  var SETTINGS_KEY = 'ap:settings';
+  var settings = { highContrast: false, colorBlind: false, reduceMotion: false };
+
+  function store(key, value) {
+    try {
+      var raw = localStorage.getItem(SETTINGS_KEY);
+      var data = raw ? JSON.parse(raw) : {};
+      data[key] = value;
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(data));
+    } catch (err) { /* modo privado / storage bloqueado: segue em memória */ }
+  }
+  function loadSettings() {
+    try {
+      var raw = localStorage.getItem(SETTINGS_KEY);
+      if (raw) {
+        var d = JSON.parse(raw);
+        ['highContrast','colorBlind','reduceMotion'].forEach(function (k) {
+          if (typeof d[k] === 'boolean') settings[k] = d[k];
+        });
+      }
+    } catch (err) {}
+    applySettings();
+  }
+  function applySettings() {
+    var root = document.documentElement;
+    root.dataset.contrast = settings.highContrast ? 'high' : 'normal';
+    root.dataset.palette  = settings.colorBlind ? 'cb' : 'normal';
+    root.dataset.motion    = settings.reduceMotion ? 'off' : 'auto';
+    $('setContrast').setAttribute('aria-checked', String(settings.highContrast));
+    $('setPalette').setAttribute('aria-checked', String(settings.colorBlind));
+    $('setMotion').setAttribute('aria-checked', String(settings.reduceMotion));
+  }
+  function bindSwitch(id, key) {
+    $(id).addEventListener('click', function () {
+      settings[key] = !settings[key];
+      applySettings();
+      store(key, settings[key]);
+    });
+  }
+  bindSwitch('setContrast', 'highContrast');
+  bindSwitch('setPalette',  'colorBlind');
+  bindSwitch('setMotion',   'reduceMotion');
+  $('btnSettings').addEventListener('click', function () { openDialog(dlgSettings); });
+
+  /* =======================================================================
+     TECLADO FÍSICO
+     ======================================================================= */
+  $('powerReveal').addEventListener('click', useReveal);
+  $('powerEliminate').addEventListener('click', useEliminate);
+
+  document.addEventListener('keydown', function (e) {
+    if (dlgResult.open || dlgSettings.open) return;                 // diálogos são modais
+    var tag = e.target && e.target.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+
+    // Atalhos com Alt+R / Alt+K (não R/E, que também são letras do teclado).
+    if (e.altKey && !e.ctrlKey && !e.metaKey) {
+      var k = e.key.toLowerCase();
+      if (k === 'r') { e.preventDefault(); useReveal(); return; }
+      if (k === 'k') { e.preventDefault(); useEliminate(); return; }
+      return;
+    }
+    if (e.ctrlKey || e.metaKey) return;
+
+    if (e.key === 'Enter') { e.preventDefault(); submitGuess(); return; }
+    if (e.key === 'Backspace' || e.key === 'Delete') { e.preventDefault(); backspace(); return; }
+    if (e.key.length === 1 && /[a-zA-Z]/.test(e.key)) { typeLetter(e.key.toUpperCase()); }
+  });
+
+  /* =======================================================================
+     BOOT
+     ======================================================================= */
+  buildGrid();
+  buildKeyboard();
+  loadSettings();
+  TARGET = sortearAlvo();
+  renderCurrentRow(false);
+  renderPowers();
+  renderStatus('6 tentativas restantes.');
+})();
+</script>
+</body>
+</html>

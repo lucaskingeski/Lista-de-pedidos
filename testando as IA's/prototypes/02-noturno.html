@@ -1,0 +1,1402 @@
+﻿<!DOCTYPE html>
+<!-- Especificacao: docs/plans/2026-10-13-adivinha-palavra.md (PRD v3.0).
+     As citacoes "PRD §x" nos comentarios deste arquivo apontam para la.
+     Addendo dos prototipos: docs/plans/2026-10-20-addendo-prototipos-web.md -->
+<html lang="pt-BR" data-theme="dark" data-tex="on" data-motion="on" data-text="normal" data-hc="off">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Adivinha Palavra — Protótipo Noturno Acessível</title>
+<meta name="description" content="Jogo de adivinhação de palavras com alto contraste, padrões de textura e navegação 100% por teclado.">
+
+<style>
+/* =========================================================================
+   PROTO 02 — "NOTURNO ACESSÍVEL"
+   Foco: WCAG 2.2 AA/AAA · daltonismo · leitores de tela · teclado · foco
+   -------------------------------------------------------------------------
+   NOTA SOBRE CONTRASTE (critério WCAG 2.2 SC 1.4.6 — Contraste Mínimo (AAA))
+   • Texto normal exige 7:1. Texto GRANDE (>= 18,66px em negrito OU >= 24px)
+     exige 4,5:1. Toda a tipografia deste arquivo é medida em rem e a base é
+     18px; as letras das células do tabuleiro ficam entre 1,5rem e 2,1rem
+     (27px–37,8px) em negrito 800 -> são texto grande por definição.
+   • O par mais "apertado" do tema normal é a letra PRETA sobre o azul
+     #2E86FF da célula "certa": 5,97:1. Isso é:
+       - AA  (1.4.3 exige 4,5:1 para texto normal) ............ ATENDIDO
+       - AAA (1.4.6 exige 7:1 texto normal / 4,5:1 texto grande) -> texto grande ATENDIDO; texto normal NAO ATINGE AAA no tema padrao
+   • O toggle "Alto contraste" troca o preenchimento por tons mais claros da
+     MESMA matiz (sem perder a identidade azul/laranja/cinza) e sobe para:
+       correta   #5AA5FF + tinta preta = 8,26:1
+       presente  #FF9F1C + tinta preta = 10,22:1
+       ausente   #9CA3AF + tinta preta = 8,27:1
+     ou seja, >= 7:1 literal em todas as células.
+   • Demais pares verificados (tema escuro / tema claro):
+       #FFFFFF sobre #000000 ......... 21,0:1
+       #BFC3C9 sobre #000000 ......... 11,9:1  (texto secundário)
+       #6FB7FF sobre #000000 .........  9,9:1  (links)
+       #FFD400 sobre #000000 ......... 14,7:1  (anel de foco)
+       #000000 sobre #FFFFFF ......... 21,0:1
+       #4B5563 sobre #FFFFFF .........  7,6:1  (texto secundário)
+       #004C9B sobre #FFFFFF .........  7,9:1  (links)
+       #000000 sobre #000000 ......... 21,0:1  (anel de foco)
+   ========================================================================= */
+
+/* ---------- 1. RESET / TOKENS ------------------------------------------ */
+*,*::before,*::after{ box-sizing:border-box; }
+
+/* Fonte base 18px (requisito). Tudo abaixo usa rem, então o toggle
+   "Tamanho de fonte grande" escala o layout inteiro de forma proporcional. */
+html{ font-size:18px; -webkit-text-size-adjust:100%; }
+[data-text="large"]{ font-size:21px; }
+
+:root{
+  /* --- Paleta de IDENTIDADE, segura para daltonismo -------------------
+     Nenhum verde e nenhum vermelho em estado deFeedback. A cor nunca é o
+     único meio de comunicação: cada estado tem ALSO cor + textura + glifo. */
+  --id-correct:#2E86FF;  /* AZ      -> "certa posição" */
+  --id-present:#FF9F1C;  /* LARANJA -> "presente"       */
+  --id-absent:#6B7280;   /* CINZA   -> "ausente"        */
+
+  /* Preenchimentos "de superfície" (variam com o tema/alto contraste) */
+  --fill-correct:#2E86FF; --ink-correct:#000000;  /* 5,97:1 (AAA texto grande) */
+  --fill-present:#FF9F1C; --ink-present:#000000;  /* 10,22:1 */
+  --fill-absent:#6B7280;  --ink-absent:#FFFFFF;   /*  4,83:1 */
+}
+
+/* ---------- 2. TEMA ESCURO (PADRÃO) ----------------------------------- */
+[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#000000;
+  --surface:#0C0C0C;
+  --surface-2:#1A1A1A;
+  --line:#6B7280;      /* borda de componente: 4,34:1 (exige 3:1) */
+  --line-soft:#3A3A3A; /* decorativa: NÃO é a única pista de nenhum estado */
+  --text:#FFFFFF;
+  --muted:#BFC3C9;     /* 11,9:1 */
+  --link:#6FB7FF;      /*  9,9:1 */
+  --focus:#FFD400;     /* 14,7:1 — amarelo puro destaca em fundo preto */
+  --focus-halo:#000000;
+  --tile-bg:#0A0A0A;
+  --tile-line:#6B7280;
+  --ok:#7CE38B;        /* confirmação: verde SÓ em texto de status, nunca
+                           como código de estado de letra (não conflita com
+                           o esquema azul/laranja/cinza das células) */
+}
+[data-theme="dark"][data-hc="on"]{ --ink-absent:#000000; }
+
+/* ---------- 3. TEMA CLARO (ALTERNÂNCIA) ------------------------------- */
+[data-theme="light"]{
+  color-scheme:light;
+  --bg:#FFFFFF;
+  --surface:#F2F2F2;
+  --surface-2:#E4E4E4;
+  --line:#4B5563;      /* 7,56:1 */
+  --line-soft:#B9B9B9;
+  --text:#000000;
+  --muted:#3B4351;     /* 9,96:1 no branco e 7,84:1 sobre --surface-2 (AAA) */
+  --link:#004C9B;      /* 7,95:1 */
+  --focus:#000000;
+  --focus-halo:#FFFFFF;
+  --tile-bg:#FFFFFF;
+  --tile-line:#4B5563;
+  --ok:#0B6B2E;
+  --ink-absent:#000000;
+}
+
+/* ---------- 4. ALTO CONTRASTE -----------------------------------------
+   Mesmas matizes, tons com luminância suficiente para >= 7:1 com a letra.
+   Bordas mais grossas, texto secundário vira texto primário, sem sombras. */
+[data-hc="on"]{
+  --surface:var(--bg);
+  --surface-2:var(--bg);
+  --line:var(--text);
+  --line-soft:var(--text);
+  --muted:var(--text);
+  --fill-correct:#5AA5FF; --ink-correct:#000000; /* 8,26:1 */
+  --fill-present:#FF9F1C; --ink-present:#000000; /* 10,22:1 */
+  --fill-absent:#9CA3AF;  --ink-absent:#000000;  /*  8,27:1 */
+}
+[data-theme="light"][data-hc="on"]{
+  --focus:#000000; --focus-halo:#FFFFFF;
+}
+
+/* ---------- 5. BASE ----------------------------------------------------- */
+body{
+  margin:0;
+  background:var(--bg);
+  color:var(--text);
+  font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+  font-size:1rem;
+  line-height:1.55;
+  min-height:100vh;
+}
+
+h1,h2,h3{ line-height:1.2; margin:0 0 .4em; }
+h1{ font-size:1.6rem; letter-spacing:-.01em; }
+h2{ font-size:1.25rem; }
+h3{ font-size:1.02rem; text-transform:uppercase; letter-spacing:.08em; }
+p{ margin:0 0 .6em; }
+a{ color:var(--link); text-underline-offset:.18em; }
+strong{ font-weight:800; }
+
+/* Foco EXTREMAMENTE visível em TODOS os elementos focáveis.
+   Regra do projeto: NUNCA remover outline sem substituto — por isso o
+   `:focus:not(:focus-visible)` recebe um anel sutil em vez de `outline:none`.
+   O `box-shadow` externo cria o "halo" (zebra focus): separa o anel de
+   qualquer cor vizinha, funcionando como link focal em tema claro. */
+:focus-visible{
+  outline:3px solid var(--focus);
+  outline-offset:3px;
+  box-shadow:0 0 0 6px var(--focus-halo);
+}
+:focus:not(:focus-visible){
+  outline:2px solid var(--line);
+  outline-offset:2px;
+}
+/* `forced-colors` (Windows Alto Contraste): o SO controla as cores, então
+   usamos `Highlight` e mantemos os padrões como pista redundante. */
+@media (forced-colors:active){
+  :focus-visible{ outline:3px solid Highlight; box-shadow:none; }
+  :focus:not(:focus-visible){ outline:2px solid GrayText; }
+}
+
+/* O container do teclado recebe foco programático após cada ação, para que
+   quem usa leitor de tela não perca o contexto e a digitação física continue.
+   O anel aqui é TRACEJADO de propósito: distingue "estou no grupo" de
+   "estou numa tecla", sem o box-amarelo sólido ficar parecendo defeito. */
+#kb:focus-visible{
+  outline:3px dashed var(--focus);
+  outline-offset:4px;
+  box-shadow:none;
+}
+
+/* ---------- 6. UTILITÁRIOS --------------------------------------------- */
+.visually-hidden{
+  position:absolute!important; width:1px; height:1px; padding:0; margin:-1px;
+  overflow:hidden; clip:rect(0 0 0 0); clip-path:inset(50%); white-space:nowrap; border:0;
+}
+[hidden]{ display:none!important; }
+
+/* Skip link: aparece SOMENTE ao receber foco (WCAG 2.4.1 Bypass Blocks). */
+.skip-link{
+  position:absolute; left:.5rem; top:-10rem; z-index:99;
+  background:var(--text); color:var(--bg);
+  padding:.7rem 1rem; border-radius:0 0 10px 10px;
+  font-weight:800; text-decoration:none;
+}
+.skip-link:focus-visible{ top:0; }
+
+.wrap{ width:min(1100px,100%); margin-inline:auto; padding-inline:clamp(.75rem,3vw,1.5rem); }
+
+.hint{ color:var(--muted); font-size:.92rem; margin:0 0 .5em; }
+.tagline{ color:var(--muted); margin:.1rem 0 .7rem; max-width:60ch; }
+
+/* ---------- 7. CABEÇALHO ----------------------------------------------- */
+.topbar{
+  border-bottom:3px solid var(--line);
+  background:var(--surface);
+  padding-block:clamp(.9rem,2.5vw,1.4rem);
+}
+.topbar__in{ display:flex; flex-wrap:wrap; gap:1rem; align-items:flex-start; }
+.topbar__id{ flex:1 1 18rem; }
+.topbar__tools{ display:flex; flex-wrap:wrap; gap:.6rem; align-items:flex-start; }
+.topbar__desc{ flex:1 1 100%; max-width:70ch; }
+
+/* ---------- 8. LAYOUT -------------------------------------------------- */
+.layout{
+  display:grid; gap:clamp(1rem,2.5vw,1.5rem);
+  grid-template-columns:1fr;
+  padding-block:clamp(1rem,3vw,2rem);
+  align-items:start;
+}
+@media (min-width:62rem){
+  .layout{ grid-template-columns:minmax(0,1.45fr) minmax(19rem,.85fr); }
+  aside.a11y{ position:sticky; top:1rem; }
+}
+
+.panel{
+  background:var(--surface);
+  border:2px solid var(--line);
+  border-radius:14px;
+  padding:clamp(.9rem,2.5vw,1.4rem);
+}
+.panel__head{ margin-bottom:.9rem; }
+.panel + .panel{ margin-top:1rem; }
+
+/* ---------- 9. BOTÕES (alvo de toque >= 48px) -------------------------- */
+.btn{
+  /* min-height 48px é o mínimo do WCAG 2.5.5 (AAA); aqui vamos a 52px+.
+     O botão NUNCA encolhe abaixo disso. */
+  min-height:52px; min-width:52px;
+  display:inline-flex; align-items:center; justify-content:center; gap:.45rem;
+  padding:.6rem 1rem;
+  font:inherit; font-weight:800; text-align:center;
+  color:var(--text); background:var(--surface-2);
+  border:2px solid var(--text); border-radius:10px;
+  cursor:pointer;
+}
+.btn:hover{ background:var(--bg); }
+/* Botão nativo de <button>: Enter e Espaço já funcionam (1.4.1 / 4.1.2). */
+/* Botão desabilitado: WCAG 1.4.3/1.4.6 isentam componentes inativos, mas
+   optamos por NÃO escurecer o texto — mantemos a tinta principal e
+   sinalizamos o desabilitado pela borda fraca e pelo contador em "0".
+   Texto legível mesmo quando não dá para clicar. */
+.btn[disabled], .btn[aria-disabled="true"]{
+  color:var(--text); border-color:var(--line);
+  background:var(--surface); cursor:not-allowed;
+}
+.btn--primary{ background:var(--text); color:var(--bg); }
+.btn--primary:hover{ background:var(--bg); color:var(--text); border-color:var(--text); }
+.btn--ghost{ background:transparent; border-color:var(--line); }
+.btn__ic{ font-size:1.1rem; line-height:1; }
+
+/* ---------- 10. LINHAS DE STATUS -------------------------------------- */
+.statusbar,.errorbar{
+  display:flex; align-items:flex-start; gap:.5rem;
+  min-height:3rem; padding:.6rem .8rem; border-radius:10px;
+  border:2px solid var(--line); background:var(--surface-2);
+  font-size:.95rem; margin:0 0 .7rem;
+}
+.errorbar{ border-color:var(--text); border-width:3px; }
+.errorbar::before{ content:"\26A0"; font-weight:900; }
+.statusbar::before{ content:"\2139"; font-weight:900; }
+
+/* ---------- 11. LEGENDA DE ESTADOS ------------------------------------
+   A legenda é o "contrato" visual do jogo: ensina que cor E textura E glifo
+   vão juntos. Sem ela, um usuário daltônico não descobre o código. */
+.legend{ list-style:none; margin:0 0 1rem; padding:0; display:grid; gap:.45rem; }
+@media (min-width:34rem){ .legend{ grid-template-columns:repeat(3,1fr); } }
+.legend li{ display:flex; align-items:center; gap:.6rem; font-size:.9rem; }
+.legend b{ display:block; }
+.legend small{ color:var(--muted); display:block; font-size:.8rem; }
+
+.sw{
+  flex:0 0 auto; width:46px; height:46px; border-radius:8px;
+  display:grid; place-items:center;
+  border:3px solid var(--line); font-weight:900; font-size:1.1rem;
+  position:relative;
+}
+.sw::after{
+  content:attr(data-g); position:absolute; right:-.15rem; top:-.4rem;
+  font-size:.8rem; color:var(--text);
+}
+.sw--correct{ background:var(--fill-correct); color:var(--ink-correct); border-color:var(--id-correct); }
+.sw--present{
+  color:var(--text);
+  background-color:var(--surface-2);
+  background-image:repeating-linear-gradient(45deg,var(--id-present) 0 5px,transparent 5px 10px);
+  border-color:var(--id-present);
+}
+.sw--absent{
+  color:var(--text);
+  background-color:var(--surface-2);
+  background-image:radial-gradient(var(--id-absent) 26%,transparent 27%);
+  background-size:10px 10px;
+  border-color:var(--id-absent);
+  border-style:dotted;
+}
+
+/* ---------- 12. TABULEIRO --------------------------------------------- */
+.board{
+  display:grid; gap:clamp(.25rem,1.2vw,.45rem);
+  width:min(100%,26rem); margin:0 auto 1.1rem;
+}
+.board__row{ display:grid; grid-template-columns:repeat(5,1fr); gap:inherit; }
+
+.cell{
+  position:relative;
+  aspect-ratio:1/1;                 /* célula quadrada, ≥48px em 360px de tela */
+  min-height:48px;
+  display:grid; place-items:center;
+  border:2px solid var(--tile-line); border-radius:9px;
+  background:var(--tile-bg); color:var(--text);
+  font-weight:800; font-size:clamp(1.5rem,6.5vw,2.05rem); line-height:1;
+  overflow:visible;
+}
+.cell[data-state="filled"]{ background:var(--surface-2); border-color:var(--text); border-width:3px; }
+.cell[data-state="correct"]{ background-color:var(--fill-correct); border-color:var(--id-correct); border-width:3px; }
+.cell[data-state="present"]{ border-color:var(--id-present); border-width:3px; }
+.cell[data-state="absent"]{ border-color:var(--id-absent); }
+
+/* Glifo textual discreto (WCAG 1.4.1): survives forced-colors, daltonismo,
+   impressão em P&B e leitores de tela que ignoram aria-label em shapes. */
+.glyph{
+  position:absolute; right:.12rem; top:0; z-index:3;
+  font-size:.62em; line-height:1; color:var(--text);
+  pointer-events:none;
+}
+.cell[data-state="correct"] .glyph{ color:var(--ink-correct); }
+
+/* Marcador do poder "Revelar" — pista adicional, com traço tracejado. */
+.cell[data-revealed="1"]{ box-shadow:inset 0 0 0 3px var(--text); }
+.cell[data-revealed="1"]::before{
+  content:"\2605"; position:absolute; left:.1rem; top:0; z-index:3;
+  font-size:.62em; line-height:1; color:var(--text);
+}
+.cell[data-state="correct"][data-revealed="1"]::before{ color:var(--ink-correct); }
+
+/* A letra fica sobre uma "placa" sólida para não competing com a textura:
+   texto sobre listra não tem contraste determinístico. */
+.ltr{ position:relative; z-index:2; padding:.1em .3em; border-radius:.3em; }
+
+/* --- PADRÕES DE TEXTURA (repeating-linear-gradient / radial-gradient) --- */
+[data-tex="on"] .cell[data-state="correct"]{
+  background-image:none;                    /* "certa" = preenchimento SÓLIDO */
+}
+[data-tex="on"] .cell[data-state="present"]{
+  background-color:var(--tile-bg);
+  background-image:repeating-linear-gradient(45deg,var(--id-present) 0 6px,transparent 6px 12px);
+}
+[data-tex="on"] .cell[data-state="absent"]{
+  background-color:var(--tile-bg);
+  background-image:radial-gradient(var(--id-absent) 27%,transparent 28%);
+  background-size:11px 11px;
+}
+[data-tex="on"] .cell[data-state="present"] .ltr,
+[data-tex="on"] .cell[data-state="absent"] .ltr{
+  background:var(--surface); color:var(--text); box-shadow:0 0 0 4px var(--surface);
+}
+[data-tex="on"] .cell[data-state="absent"] .ltr{ color:var(--muted); }
+[data-tex="on"] .cell[data-state="correct"] .ltr{
+  background:transparent; box-shadow:none; color:var(--ink-correct);
+}
+
+/* --- Modo SEM textura: fundo sólido + letra de alto contraste --------- */
+[data-tex="off"] .cell[data-state="present"]{ background-color:var(--fill-present); }
+[data-tex="off"] .cell[data-state="absent"]{ background-color:var(--fill-absent); }
+[data-tex="off"] .cell[data-state="present"] .ltr{ color:var(--ink-present); }
+[data-tex="off"] .cell[data-state="absent"] .ltr{ color:var(--ink-absent); }
+[data-tex="off"] .cell[data-state="correct"] .ltr{ color:var(--ink-correct); }
+
+/* ---------- 13. PODERES ------------------------------------------------ */
+.powers{ display:flex; flex-wrap:wrap; gap:.7rem; margin-bottom:1rem; }
+.pw{
+  flex:1 1 13rem; flex-direction:column; align-items:flex-start; gap:.15rem;
+  min-height:64px; padding:.6rem .9rem;
+}
+.pw__k{ font-size:1.15rem; font-weight:900; }
+/* Hierarquia do botão de poder: rótulo em negrito + descrição secundária.
+   A hierarquia vem do PESO e do opacidade — nunca de uma cor mais fraca,
+   porque a cor secundária sobre o fundo invertido do botão primário
+   (branco no escuro / preto no claro) despencava para ~1,8:1. */
+.pw__d{ font-size:.82rem; font-weight:500; color:var(--text); opacity:.72; text-align:left; }
+.btn--primary .pw__d{ color:var(--bg); opacity:.78; }
+/* Este precisa repetir a COR, não só a opacidade: quando o botão primário
+   desabilita, o fundo dele deixa de ser "invertido" (vira --surface) e a cor
+   var(--bg) do botão primário passaria a ser invisível sobre ele. */
+.btn[disabled] .pw__d{ color:var(--text); opacity:.75; }
+.badge{
+  display:inline-grid; place-items:center; min-width:1.5rem; height:1.5rem;
+  padding:0 .35rem; border-radius:999px; font-size:.8rem; font-weight:900;
+  background:var(--text); color:var(--bg);
+}
+/* Badge do contador de usos. Quando o poder é gasto, o badge some da tela
+   invertida: precisa de um fundo que atinja 7:1 com var(--bg) nos DOIS temas
+   (o cinza de borda --line dava só 4,34:1 sobre preto no tema escuro). */
+.btn[disabled] .badge{ background:var(--muted); color:var(--bg); }
+
+/* ---------- 14. TECLADO VIRTUAL ---------------------------------------
+   Grade plana; a ordem do DOM = ordem visual = ordem de tabulação.
+   A quebra em 2 layouts (10 colunas / 6 colunas) existe para GARANTIR
+   alvos de toque >= 48px em telas de 360px (6 col x 52px = 312px + gaps). */
+.kb{
+  display:grid; gap:.3rem;
+  grid-template-columns:repeat(6,minmax(0,1fr));
+  width:100%;
+}
+/* Em telas estreitas o teclado ganha "sangria" até a borda interna do painel e
+   aperta o gap: sem isso, 6 colunas em 360px dariam teclas de ~43px, abaixo do
+   alvo mínimo de 48px (WCAG 2.5.5 AAA / requisito do projeto).
+   `width:auto` é obrigatório: com width:100% a margem negativa só desloca a
+   caixa, sem abrir espaço para as teclas.
+   Cálculo em 360px: 296,6px + 2 x 16,2px = 329px -> 6 x 50px + 5 gaps de 5,4px. */
+@media (max-width:39.999rem){
+  .kb{
+    width:auto;
+    margin-inline:calc(-1 * clamp(.9rem,2.5vw,1.4rem));
+  }
+}
+/* Layout largo (QWERTY clássico de 10 colunas) só entra em 640px: é o ponto em
+   que 10 teclas de 48px + 9 gaps cabem com folga, mesmo com a fonte grande.
+   O JS (layoutKeys) usa a MESMA media query — se divergirem, a ordem do DOM
+   deixa de bater com a ordem visual e o tab order quebra. */
+@media (min-width:40rem){
+  .kb{ grid-template-columns:repeat(10,minmax(0,1fr)); max-width:34rem; margin-inline:auto; }
+}
+
+.key{
+  min-height:52px; min-width:0;
+  display:grid; place-items:center;
+  font:inherit; font-weight:800; font-size:1.05rem;
+  color:var(--text); background:var(--surface-2);
+  border:2px solid var(--line); border-radius:8px;
+  cursor:pointer; user-select:none; -webkit-user-select:none;
+}
+.key:hover{ background:var(--bg); }
+.key--wide{ font-size:1.25rem; font-weight:900; }
+.key[data-state="correct"]{ background-color:var(--fill-correct); border-color:var(--id-correct); color:var(--ink-correct); }
+.key[data-state="present"]{ border-color:var(--id-present); border-width:3px; }
+.key[data-state="absent"]{ border-color:var(--id-absent); color:var(--muted); }
+.key[data-state="absent"][data-power="1"]{ text-decoration:line-through 3px; text-decoration-color:var(--text); }
+
+[data-tex="on"] .key[data-state="present"]{
+  background-color:var(--surface-2);
+  background-image:repeating-linear-gradient(45deg,var(--id-present) 0 5px,transparent 5px 10px);
+}
+[data-tex="on"] .key[data-state="absent"]{
+  background-image:radial-gradient(var(--id-absent) 28%,transparent 29%);
+  background-size:9px 9px;
+}
+/* Letra do teclado: fundo sólido por baixo para contraste determinístico. */
+.key{ position:relative; }
+.key > span{ position:relative; z-index:2; padding:0 .18em; border-radius:4px; }
+[data-tex="on"] .key[data-state="present"] > span,
+[data-tex="on"] .key[data-state="absent"] > span{ background:var(--surface-2); box-shadow:0 0 0 3px var(--surface-2); }
+[data-tex="off"] .key[data-state="present"]{ background-color:var(--fill-present); color:var(--ink-present); }
+[data-tex="off"] .key[data-state="absent"]{ background-color:var(--fill-absent); color:var(--ink-absent); }
+
+/* ---------- 15. PAINEL DE ACESSIBILIDADE ------------------------------ */
+.toggles{ list-style:none; margin:0 0 1.2rem; padding:0; display:grid; gap:.2rem; }
+.opt{ display:flex; gap:.55rem; align-items:center; padding:.5rem .35rem; border-radius:8px; }
+.opt:hover{ background:var(--surface-2); }
+/* Checkbox NATIVO estilizado: mantém o comportamento de formulário em todos
+   os navegadores/leitores e sobrevive ao modo forced-colors do Windows.
+   O elemento mede 48x48px (alvo de toque real) enquanto o "quadrado" visível
+   é de 26px, desenhado por ::before. Assim o clique/toque funciona em toda a
+   área de 48px, sem um checkbox gigante e desproporcional. */
+.opt input[type="checkbox"]{
+  appearance:none; -webkit-appearance:none;
+  flex:0 0 auto; width:48px; height:48px; margin:0; padding:0;
+  position:relative; background:transparent; border:0; cursor:pointer;
+}
+.opt input[type="checkbox"]::before{
+  content:""; position:absolute; left:50%; top:50%;
+  width:26px; height:26px; transform:translate(-50%,-50%);
+  border:3px solid var(--text); border-radius:6px; background:var(--bg);
+}
+.opt input[type="checkbox"]::after{
+  content:"\2713"; position:absolute; left:50%; top:50%;
+  transform:translate(-50%,-50%);
+  font-size:1.1rem; font-weight:900; line-height:1;
+  color:var(--text); opacity:0;
+}
+.opt input[type="checkbox"]:checked::before{ background:var(--surface-2); }
+.opt input[type="checkbox"]:checked::after{ opacity:1; }
+@media (forced-colors:active){
+  .opt input[type="checkbox"]{ appearance:auto; -webkit-appearance:auto; width:28px; height:28px; }
+  .opt input[type="checkbox"]::before,
+  .opt input[type="checkbox"]::after{ display:none; }
+}
+.opt__t{ display:block; font-weight:800; }
+.opt__d{ display:block; font-size:.85rem; color:var(--muted); }
+
+.mini-table{ width:100%; border-collapse:collapse; font-size:.86rem; margin-bottom:1rem; }
+.mini-table caption{ text-align:left; color:var(--muted); font-size:.86rem; padding-bottom:.4rem; }
+.mini-table th,.mini-table td{ text-align:left; padding:.4rem .5rem; border-top:2px solid var(--line-soft); }
+.mini-table th{ font-weight:800; }
+
+/* ---------- 16. RESULTADO / COMPARTILHAR ------------------------------ */
+.share-fmt{ display:grid; gap:.3rem; margin-bottom:.9rem; }
+.share-fmt label{ font-weight:800; }
+select,textarea{
+  font:inherit; color:var(--text); background:var(--bg);
+  border:2px solid var(--line); border-radius:8px; padding:.5rem .6rem;
+}
+select{ min-height:52px; width:100%; }
+textarea{ width:100%; min-height:9rem; resize:vertical; font-family:ui-monospace,SFMono-Regular,Consolas,monospace; font-size:.92rem; }
+.actions{ display:flex; flex-wrap:wrap; gap:.7rem; }
+
+.result__verdict{ font-size:1.2rem; font-weight:900; margin:0 0 .4em; }
+.result__meta{ color:var(--muted); font-size:.92rem; }
+
+/* ---------- 17. RODAPÉ ------------------------------------------------- */
+.foot{
+  border-top:3px solid var(--line);
+  padding-block:1rem 2rem; color:var(--muted); font-size:.88rem;
+}
+
+/* ---------- 18. MOVIMENTO ---------------------------------------------
+   Animations mínimas e curtas: nada de rotação, parallax, zoom ou
+   deslocamento grande — Principalmente para evitar enjoo vestibular.
+   A favor de prefers-reduced-motion: a mídia query vence o toggle do
+   usuário (é a prática mais segura — WCAG 2.3.3 AAA). */
+@keyframes shake{
+  10%,90%{ transform:translateX(-2px) }
+  20%,80%{ transform:translateX(3px) }
+  30%,50%,70%{ transform:translateX(-5px) }
+  40%,60%{ transform:translateX(5px) }
+}
+@keyframes pop{
+  0%{ transform:scale(.9) } 60%{ transform:scale(1.05) } 100%{ transform:scale(1) }
+}
+.shake{ animation:shake .42s ease-in-out; }
+.pop{ animation:pop .3s ease-out backwards; }
+
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{
+    animation-duration:.001ms!important; animation-iteration-count:1!important;
+    transition-duration:.001ms!important; scroll-behavior:auto!important;
+  }
+}
+[data-motion="off"] *,
+[data-motion="off"] *::before,
+[data-motion="off"] *::after{
+  animation-duration:.001ms!important; animation-iteration-count:1!important;
+  transition-duration:.001ms!important; scroll-behavior:auto!important;
+}
+
+/* Alto contraste: bordas grossas, sem sombras suaves */
+[data-hc="on"] .cell,
+[data-hc="on"] .key,
+[data-hc="on"] .panel{ border-width:3px; }
+[data-hc="on"] .btn{ border-width:3px; }
+[data-hc="on"] .cell[data-revealed="1"]{ box-shadow:inset 0 0 0 4px var(--text); }
+[data-hc="on"] a{ text-decoration:underline; }
+
+/* Impressão: mantém a distinção de estados mesmo em preto e branco */
+@media print{
+  body{ background:#fff; color:#000; }
+  .kb,.powers,.a11y,.topbar__tools{ display:none; }
+}
+</style>
+</head>
+
+<body>
+
+<!-- Skip link: primeiro elemento focável da página (WCAG 2.4.1) -->
+<a class="skip-link" href="#conteudo">Pular para o jogo</a>
+
+<header class="topbar" role="banner">
+  <div class="wrap topbar__in">
+    <div class="topbar__id">
+      <h1>Adivinha Palavra</h1>
+      <p class="tagline">Protótipo “Noturno Acessível”: contraste máximo, padrões de textura, navegação 100% por teclado e leitura de tela sem depender de cor.</p>
+    </div>
+    <div class="topbar__tools">
+      <!-- Botão de tema. O rótulo DESCREVE A AÇÃO (“Tema claro”), então não
+           usamos aria-pressed: rótulo mutável + estado pressionado é
+           ambíguo para leitores de tela (padrãoaccessibility antipadrão). -->
+      <button type="button" id="themeBtn" class="btn btn--ghost" aria-describedby="themeDesc">
+        <span class="btn__ic" aria-hidden="true">◐</span>
+        <span id="themeBtnTxt">Tema claro</span>
+      </button>
+    </div>
+    <p id="themeDesc" class="hint topbar__desc">
+      Alterna entre fundo preto com texto branco (padrão) e o inverso.
+      A preferência é salva neste dispositivo e reaplicada na próxima visita.
+    </p>
+  </div>
+</header>
+
+<div class="wrap layout">
+
+  <!-- ============ MAIN ============ -->
+  <main id="conteudo" tabindex="-1">
+    <section class="panel" id="jogo" aria-labelledby="jogoTitle" tabindex="-1">
+      <div class="panel__head">
+        <h2 id="jogoTitle">Tabuleiro</h2>
+        <p class="hint" id="jogoDesc">
+          Objetivo: adivinhar a palavra de 5 letras em até 6 tentativas.
+          Cada letra recebe um estado — <strong>certa posição</strong>,
+          <strong>presente</strong> ou <strong>ausente</strong> — sempre
+          comunicado por <strong>cor, textura e glifo juntos</strong>, nunca só por cor.
+        </p>
+      </div>
+
+      <!-- Legenda: ensina o código de cores/texturas/glifos -->
+      <h3 id="legTitle">Legenda dos estados</h3>
+      <ul class="legend" aria-labelledby="legTitle">
+        <li>
+          <span class="sw sw--correct" data-g="✓" aria-hidden="true">A</span>
+          <span><b>Certa posição ✓</b><small>Preenchimento azul sólido</small></span>
+        </li>
+        <li>
+          <span class="sw sw--present" data-g="~" aria-hidden="true">A</span>
+          <span><b>Presente ~</b><small>Hachura diagonal (/) em laranja</small></span>
+        </li>
+        <li>
+          <span class="sw sw--absent" data-g="✕" aria-hidden="true">A</span>
+          <span><b>Ausente ✕</b><small>Pontilhado em cinza</small></span>
+        </li>
+      </ul>
+
+      <!-- role=status já implica aria-live="polite" (WCAG 4.1.3) -->
+      <p id="statusbar" class="statusbar" role="status" aria-live="polite" aria-atomic="true">
+        Digite uma palavra de 5 letras e pressione Enter. Teclado físico ou o teclado na tela.
+      </p>
+      <!-- role="alert" implica aria-live="assertive": erros não podem esperar. -->
+      <p id="errorbar" class="errorbar" role="alert" aria-live="assertive" aria-atomic="true" hidden></p>
+
+      <div id="board" class="board" role="group"
+           aria-label="Tabuleiro: 6 linhas de 5 letras"
+           aria-describedby="jogoDesc"></div>
+
+      <h3 id="pwTitle">Poderes (1 uso cada)</h3>
+      <div class="powers" role="group" aria-labelledby="pwTitle">
+        <button type="button" id="pwReveal" class="btn pw" aria-label="Revelar" aria-describedby="pwRevealD">
+          <span class="pw__k" aria-hidden="true">&#9679; Revelar</span>
+          <span class="pw__d" id="pwRevealD">Preenche a próxima posição ainda errada com a letra correta. Não conta como tentativa.</span>
+          <span class="badge" aria-hidden="true">1</span>
+        </button>
+        <button type="button" id="pwElim" class="btn pw" aria-label="Eliminar" aria-describedby="pwElimD">
+          <span class="pw__k" aria-hidden="true">&#8856; Eliminar</span>
+          <span class="pw__d" id="pwElimD">Desativa até 2 letras do teclado que não existem na palavra secreta. Não conta como tentativa.</span>
+          <span class="badge" aria-hidden="true">1</span>
+        </button>
+        <button type="button" id="restart" class="btn btn--primary" aria-label="Reiniciar" aria-describedby="restartD">
+          <span class="pw__k" aria-hidden="true">&#8635; Reiniciar</span>
+          <span class="pw__d" id="restartD">Começa uma nova partida do zero, sem confirmar.</span>
+        </button>
+      </div>
+
+      <div id="kb" class="kb" role="group" tabindex="-1"
+           aria-label="Teclado virtual QWERTY"
+           aria-describedby="kbDesc"></div>
+      <p id="kbDesc" class="hint" style="margin-top:.7rem">
+        Cada tecla é um <code>&lt;button&gt;</code>: use <kbd>Tab</kbd> para percorrer,
+        <kbd>Enter</kbd> ou <kbd>Espaço</kbd> para ativar.
+        Com teclado físico, digite as letras, <kbd>Enter</kbd> envia e
+        <kbd>Backspace</kbd> apaga. A ordem de tabulação segue a ordem visual.
+      </p>
+    </section>
+
+    <section class="panel" id="resultado" aria-labelledby="resTitle" hidden>
+      <div class="panel__head">
+        <h2 id="resTitle" tabindex="-1">Resultado</h2>
+        <p class="result__verdict" id="resVerdict"></p>
+        <p class="result__meta" id="resMeta"></p>
+      </div>
+      <p class="hint" id="shareDesc">
+        O texto abaixo mostra apenas os estados das tentativas — <strong>nunca revela a palavra secreta</strong>.
+      </p>
+      <div class="share-fmt">
+        <label for="shareFmt">Formato do compartilhamento</label>
+        <select id="shareFmt" aria-describedby="shareDesc">
+          <option value="blocks">Blocos coloridos (🟦 certa · 🟧 presente · ⬛ ausente)</option>
+          <option value="sym">Símbolos sem cor (✓ certa · ~ presente · ✕ ausente) — recomendado para daltonismo e alto contraste</option>
+        </select>
+        <label for="shareTxt">Texto para copiar</label>
+        <textarea id="shareTxt" rows="7" readonly spellcheck="false" aria-describedby="shareDesc"></textarea>
+      </div>
+      <div class="actions">
+        <button type="button" id="copyBtn" class="btn btn--primary" aria-describedby="copyDesc">
+          <span aria-hidden="true">&#128203;</span> Copiar texto
+        </button>
+        <p class="hint" id="copyDesc" style="flex:1 1 12rem;align-self:center;margin:0">
+          A cópia usa a área de transferência do sistema; se não estiver disponível, o texto já fica selecionado para <kbd>Ctrl+C</kbd>.
+        </p>
+      </div>
+    </section>
+  </main>
+
+  <!-- ============ ASIDE (complementar, fora da ordem principal) ========= -->
+  <aside class="panel a11y" aria-labelledby="a11yTitle">
+    <div class="panel__head">
+      <h2 id="a11yTitle">Acessibilidade</h2>
+      <p class="hint">Preferências salvas neste dispositivo (<code>localStorage</code>) e aplicadas sem recarregar a página.</p>
+    </div>
+
+    <ul class="toggles">
+      <li>
+        <label class="opt">
+          <input type="checkbox" id="tHC" role="switch" aria-describedby="dHC">
+          <span>
+            <span class="opt__t">Alto contraste</span>
+            <span class="opt__d" id="dHC">Tons mais claros das mesmas cores + bordas grossas. Leva todas as letras das células a <strong>≥ 7:1</strong>.</span>
+          </span>
+        </label>
+      </li>
+      <li>
+        <label class="opt">
+          <input type="checkbox" id="tTex" role="switch" aria-describedby="dTex">
+          <span>
+            <span class="opt__t">Padrões de textura</span>
+            <span class="opt__d" id="dTex">Hachura diagonal em “presente”, pontilhado em “ausente”, sólido em “certa”. Permite jogar <strong>sem distinguir cor</strong>.</span>
+          </span>
+        </label>
+      </li>
+      <li>
+        <label class="opt">
+          <input type="checkbox" id="tMotion" role="switch" aria-describedby="dMotion">
+          <span>
+            <span class="opt__t">Reduzir animações</span>
+            <span class="opt__d" id="dMotion">Desliga o shake de erro e a animação de revelação. Se o sistema pedir <code>prefers-reduced-motion</code>, esta opção fica ligada e não pode ser desativada.</span>
+          </span>
+        </label>
+      </li>
+      <li>
+        <label class="opt">
+          <input type="checkbox" id="tText" role="switch" aria-describedby="dText">
+          <span>
+            <span class="opt__t">Tamanho de fonte grande</span>
+            <span class="opt__d" id="dText">Sobe a base de 18px para 21px. Todo o layout é dimensionado em <code>rem</code> e acompanha.</span>
+          </span>
+        </label>
+      </li>
+      <li>
+        <label class="opt">
+          <input type="checkbox" id="tHints" role="switch" aria-describedby="dHints">
+          <span>
+            <span class="opt__t">Dicas para leitor de tela</span>
+            <span class="opt__d" id="dHints">Detalha o significado de cada estado nos rótulos das células e nas mensagens (“existe na palavra, mas em outra posição”). Desligado, o texto fica curto.</span>
+          </span>
+        </label>
+      </li>
+    </ul>
+
+    <h3 id="tecTitle">Tecnologia usada</h3>
+    <table class="mini-table" aria-labelledby="tecTitle">
+      <caption>Como este protótipo resolve cada requisito.</caption>
+      <tbody>
+        <tr><th scope="row">Daltonismo</th><td>Azul / laranja / cinza + textura + glifo</td></tr>
+        <tr><th scope="row">Contraste</th><td>21:1 no texto; ≥7:1 nas células no alto contraste</td></tr>
+        <tr><th scope="row">Teclado</th><td>QWERTY físico e virtual, <kbd>Enter</kbd>/<kbd>Backspace</kbd>, ordem lógica</td></tr>
+        <tr><th scope="row">Leitor de tela</th><td><code>role="status"</code>, <code>role="alert"</code>, rótulo por célula</td></tr>
+        <tr><th scope="row">Foco</th><td>Anel 3px + halo, nunca removido</td></tr>
+        <tr><th scope="row">Toque</th><td>Todos os alvos ≥ 48px</td></tr>
+        <tr><th scope="row">Movimento</th><td>Curto e suave; respeita <code>prefers-reduced-motion</code></td></tr>
+      </tbody>
+    </table>
+  </aside>
+</div>
+
+<footer class="foot wrap">
+  <p>
+    Protótipo 02 — “Noturno Acessível”. Funciona offline e sem dependências
+    externas: o dicionário de tentativas (~14,5 mil palavras de 5 letras) vem de
+    <code>dicionario.js</code>, compartilhado com os outros dois protótipos. <strong>A palavra-alvo é sorteada a cada reinício</strong>, sempre a partir do dicionário.
+  </p>
+</footer>
+
+<!-- Dicionário compartilhado entre os protótipos: fonte única de verdade,
+     curada com ~14,5 mil palavras portuguesas de 5 letras. Mantenha este
+     arquivo ao lado do HTML — sem ele o jogo cai na lista mínima de fallback. -->
+<script src="dicionario.js"></script>
+<script>
+"use strict";
+(function () {
+  /* =====================================================================
+     DADOS
+     ===================================================================== */
+  let TARGET = "TERMO";
+  const WORD_LEN = 5;
+  const MAX_GUESSES = 6;
+  /* Tentativas válidas: dicionario.js é a fonte única dos três protótipos
+     (~14,5 mil palavras de 5 letras). O fallback mantém o jogo funcionando
+     caso o HTML seja aberto sem o dicionario.js ao lado. */
+  const FALLBACK = new Set([
+    "CRANE","STARE","ADIEU","RAISE","SLATE","TERMO","MENTE",
+    "PEDRA","NUVEM","FLORE","BARCO","CASAS","TROCA","NOTAS"
+  ]);
+  const ACCEPTED = (window.DICIONARIO_PT5 && window.DICIONARIO_PT5.size > 1000)
+    ? window.DICIONARIO_PT5
+    : FALLBACK;
+
+  /* Palavra-alvo: subconjunto curado do dicionário compartilhado (~1,7 mil
+     palavras comuns), sorteado a cada reinício. `ultimoAlvo` impede repetir
+     a palavra da partida anterior. */
+  const RESPOSTAS = (window.DICIONARIO_RESPOSTAS && window.DICIONARIO_RESPOSTAS.length)
+    ? window.DICIONARIO_RESPOSTAS : [...FALLBACK];
+  let ultimoAlvo = null;
+  function sortearAlvo(){
+    if (RESPOSTAS.length < 2) return RESPOSTAS[0] || "TERMO";
+    let novo;
+    do { novo = RESPOSTAS[Math.floor(Math.random() * RESPOSTAS.length)]; }
+    while (novo === ultimoAlvo);
+    ultimoAlvo = novo;
+    return novo;
+  }
+  const LETTERS = "QWERTYUIOPASDFGHJKLZXCVBNM".split("");
+
+  const STATE_NAME = { correct:"certa posição", present:"presente", absent:"ausente" };
+  const GLYPH      = { correct:"✓", present:"~", absent:"✕" };
+  const KEY_RANK   = { unknown:0, absent:1, present:2, correct:3 }; // monotônico
+
+  /* =====================================================================
+     ESTADO DO JOGO
+     ===================================================================== */
+  const game = {
+    guesses:[], feedback:[], current:[], revealed:new Set(),
+    keyState:{}, powers:{ reveal:true, eliminate:true }, over:false
+  };
+
+  const a11y = {
+    theme:"dark", hc:false, tex:true,
+    motion: !window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+    text:"normal", hints:true
+  };
+  const STORE_KEY = "ap02:a11y";
+
+  /* =====================================================================
+     PERSISTÊNCIA (tolerante a localStorage bloqueado / modo privado)
+     ===================================================================== */
+  function loadPrefs(){
+    try{
+      const raw = localStorage.getItem(STORE_KEY);
+      if (!raw) return;
+      const o = JSON.parse(raw);
+      for (const k of Object.keys(a11y)) if (k in o) a11y[k] = o[k];
+    }catch(e){ /* segue com os padrões */ }
+  }
+  function savePrefs(){
+    try{ localStorage.setItem(STORE_KEY, JSON.stringify(a11y)); }catch(e){}
+  }
+
+  /* =====================================================================
+     DOM
+     ===================================================================== */
+  const $ = (s,r=document)=>r.querySelector(s);
+  const root      = document.documentElement;
+  const boardEl   = $("#board");
+  const kbEl      = $("#kb");
+  const statusEl  = $("#statusbar");
+  const errorEl   = $("#errorbar");
+  const resultEl  = $("#resultado");
+  const resVerdict= $("#resVerdict");
+  const resMeta   = $("#resMeta");
+  const shareTxt  = $("#shareTxt");
+  const shareFmt  = $("#shareFmt");
+  const pwReveal  = $("#pwReveal");
+  const pwElim    = $("#pwElim");
+  const restartBtn= $("#restart");
+
+  /* =====================================================================
+     ALGORITMO DE FEEDBACK — 2 PASSAGENS (letras repetidas)
+     Nota: o exemplo "CRANE vs TERMO" resulta em
+           (ausente, presente, ausente, ausente, PRESENTE)
+     porque E existe em TERMO. O exemplo do briefing omiteu esse último "presente";
+     a implementação segue o algoritmo de 2 passos especificado e usado no PRD §4.1.
+     ===================================================================== */
+  function evaluate(guess, target){
+    const res = new Array(target.length).fill("absent");
+    const count = Object.create(null);
+    for (const ch of target) count[ch] = (count[ch] || 0) + 1;
+
+    // Passo 1 — verdes (posições exatas) consumem a contagem primeiro.
+    for (let i=0;i<target.length;i++){
+      if (guess[i] === target[i]){ res[i]="correct"; count[target[i]]--; }
+    }
+    // Passo 2 — amarelos/ausentes com a contagem remanescente.
+    for (let i=0;i<target.length;i++){
+      if (res[i] === "correct") continue;
+      const ch = guess[i];
+      if ((count[ch] || 0) > 0){ res[i]="present"; count[ch]--; }
+    }
+    return res;
+  }
+  /* Testes embutidos (documentação viva do comportamento com letras repetidas).
+     Eles ficam no console e acusam loudly se a lógica regredir um dia:
+       - "EBAE" vs "EBAB": as 3 primeiras batem na posição, a contagem de E
+         zera e a última E vira "ausente" — e não "presente";
+       - "ABBE" vs "EBAB": só a 2a letra e fixa; as 3 restantes viram
+         "presente" consumindo a contagem de A/B que sobrou;
+       - "TERRO" vs "TERMO": o R extra e "ausente", pois o R de TERMO ja foi
+         consumido pelo verde da posicao 3 (ordem greens -> yellows). */
+  console.assert(evaluate("EBAE","EBAB").join()==="correct,correct,correct,absent", "EBAE/EBAB");
+  console.assert(evaluate("ABBE","EBAB").join()==="present,correct,present,present", "ABBE/EBAB");
+  console.assert(evaluate("TERRO","TERMO").join()==="correct,correct,correct,absent,correct", "TERRO/TERMO");
+  console.assert(evaluate("ABBAB","ABBBB").join()==="correct,correct,correct,absent,correct", "ABBAB/ABBBB");
+  console.assert(evaluate("CRANE","TERMO").join()==="absent,present,absent,absent,present", "CRANE/TERMO");
+
+  /* =====================================================================
+     TEMA / PREFERÊNCIAS -> HTML data-*
+     ===================================================================== */
+  function applyPrefs(){
+    root.dataset.theme = a11y.theme;
+    root.dataset.hc    = a11y.hc ? "on" : "off";
+    root.dataset.tex   = a11y.tex ? "on" : "off";
+    root.dataset.motion= a11y.motion ? "on" : "off";
+    root.dataset.text  = a11y.text;
+    $("#tHC").checked = a11y.hc;
+    $("#tTex").checked = a11y.tex;
+    $("#tMotion").checked = a11y.motion;
+    $("#tText").checked = a11y.text === "large";
+    $("#tHints").checked = a11y.hints;
+    $("#themeBtnTxt").textContent = a11y.theme === "dark" ? "Tema claro" : "Tema escuro";
+    $("#themeBtn").querySelector(".btn__ic").textContent = a11y.theme === "dark" ? "☀" : "☾";
+    document.title = (a11y.theme === "dark" ? "Noturno" : "Diurno") + " — Adivinha Palavra";
+  }
+
+  /* =====================================================================
+     ANÚNCIOS (regiões live)
+     ===================================================================== */
+  function say(msg){
+    // Limpar antes de escrever força o leitor de tela a reanunciar mensagens
+    // idênticas seguidas (armadilha clássica de aria-live).
+    statusEl.textContent = "";
+    window.setTimeout(function(){ statusEl.textContent = msg; }, 30);
+  }
+  function fail(msg){
+    errorEl.hidden = false;
+    errorEl.textContent = "";
+    window.setTimeout(function(){ errorEl.textContent = msg; }, 30);
+  }
+  function clearError(){ errorEl.hidden = true; errorEl.textContent = ""; }
+
+  function shakeBoard(){
+    if (!a11y.motion) return;           // respeita prefers-reduced-motion
+    boardEl.classList.remove("shake");
+    void boardEl.offsetWidth;            // reinicia a animação
+    boardEl.classList.add("shake");
+    window.setTimeout(()=>boardEl.classList.remove("shake"), 460);
+  }
+
+  /* =====================================================================
+     RÓTULOS DE CÉLULA — formato pedido no briefing
+     ===================================================================== */
+  function cellLabel(col, letter, st){
+    if (st === "empty")   return "Posição " + (col+1) + ": vazio";
+    if (st === "filled")  return "Posição " + (col+1) + ": letra " + letter + ", em preenchimento";
+    let l = "Posição " + (col+1) + ": letra " + letter + ", " + STATE_NAME[st];
+    if (a11y.hints){
+      if (st === "present") l += " — existe na palavra, mas em outra posição";
+      if (st === "absent")  l += " — não existe na palavra";
+      if (st === "correct") l += " — acertou a letra e a posição";
+    }
+    return l;
+  }
+
+  /* =====================================================================
+     TABULEIRO
+     ===================================================================== */
+  function buildBoard(){
+    boardEl.innerHTML = "";
+    for (let r=0;r<MAX_GUESSES;r++){
+      const row = document.createElement("div");
+      row.className = "board__row";
+      row.setAttribute("role","group");
+      row.setAttribute("aria-label","Linha " + (r+1) + " de " + MAX_GUESSES);
+      for (let c=0;c<WORD_LEN;c++){
+        const cell = document.createElement("div");
+        // role="img" + aria-label: um "grafico nomeado" — o leitor de tela
+        // anuncia o rótulo uma vez e ignora o texto duplicado do glifo.
+        cell.className = "cell";
+        cell.setAttribute("role","img");
+        cell.dataset.r = r; cell.dataset.c = c; cell.dataset.state = "empty";
+        const ltr = document.createElement("span");
+        ltr.className = "ltr"; ltr.setAttribute("aria-hidden","true");
+        const gl  = document.createElement("span");
+        gl.className = "glyph"; gl.setAttribute("aria-hidden","true");
+        cell.append(ltr, gl);
+        row.append(cell);
+      }
+      boardEl.append(row);
+    }
+  }
+
+  function renderBoard(animateLastRow){
+    const cells = boardEl.querySelectorAll(".cell");
+    cells.forEach(function(cell){
+      const r = +cell.dataset.r, c = +cell.dataset.c;
+      const key = r + "-" + c;
+      let st = "empty", letter = "";
+
+      if (r < game.guesses.length){          // linha já enviada
+        letter = game.guesses[r][c];
+        st = game.feedback[r][c];
+      } else if (r === game.guesses.length){ // linha em edição
+        letter = game.current[c] || "";
+        st = letter ? "filled" : "empty";
+      }
+
+      cell.dataset.state = st;
+      cell.dataset.revealed = game.revealed.has(key) ? "1" : "0";
+      cell.setAttribute("aria-label",
+        cellLabel(c, letter, st) + (game.revealed.has(key) && st === "filled" ? ", revelada pelo poder" : ""));
+      cell.querySelector(".ltr").textContent = letter;
+      cell.querySelector(".glyph").textContent = GLYPH[st] || "";
+
+      // Revelação escalonada de 80ms/letra — desligada em reduced-motion.
+      const pop = cell.querySelector(".ltr");
+      if (animateLastRow && r === game.guesses.length-1){
+        pop.classList.remove("pop");
+        pop.style.animationDelay = a11y.motion ? (c * 0.08) + "s" : "0s";
+        void pop.offsetWidth;
+        pop.classList.add("pop");
+      }
+    });
+  }
+
+  /* =====================================================================
+     TECLADO VIRTUAL
+     Dois layouts para nunca quebrar o alvo mínimo de 48px:
+       >= 640px -> 10 colunas (QWERTY clássico)
+       <  640px -> 6 colunas  (6 teclas de ~50px cabem em 360px mantendo alvo >= 48px)
+     A ordem do DOM é montada na MESMA ordem visual -> tabulação previsível.
+     ===================================================================== */
+  const kbButtons = Object.create(null);
+
+  /* Os botões são criados UMA vez e apenas reordenados. Assim a reflow da
+     grade (mudança de layout ao cruzar 640px) nunca perde o estado de feedback. */
+  function buildKeys(){
+    const codes = LETTERS.concat(["EN","BS"]);
+    codes.forEach(function(code){
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "key" + (code === "EN" || code === "BS" ? " key--wide" : "");
+      b.dataset.code = code;
+      b.dataset.state = "unknown";
+      const s = document.createElement("span");
+      s.setAttribute("aria-hidden","true");
+      s.textContent = code === "EN" ? "↵" : code === "BS" ? "⌫" : code;
+      b.append(s);
+      kbButtons[code] = b;
+    });
+  }
+
+  const KB_WIDE = "(min-width:40rem)"; // MESMA media query do CSS .kb
+  function layoutKeys(){
+    const wide = window.matchMedia(KB_WIDE).matches;
+    /* Ordem do DOM = ordem visual = ordem de tabulação (WCAG 2.4.3). */
+    const ROWS = wide
+      ? [["Q","W","E","R","T","Y","U","I","O","P"],
+         ["A","S","D","F","G","H","J","K","L","BS"],
+         ["EN","Z","X","C","V","B","N","M"]]           // 10 colunas, clássico
+      : [["Q","W","E","R","T","Y"],
+         ["U","I","O","P","BS"],
+         ["A","S","D","F","G","H"],
+         ["J","K","L","M","EN"],
+         ["Z","X","C","V","B","N"]];                    // 6 colunas, 6x52px em 360px
+    kbEl.innerHTML = "";
+    ROWS.forEach(function(row){
+      row.forEach(function(code){
+        const b = kbButtons[code];
+        // Em cada layout UMA das teclas especiais ocupa 2 células, fechando
+        // exatamente a largura da grade (10 ou 6) sem buracos.
+        const span = (wide && code === "EN") || (!wide && code === "BS");
+        b.style.gridColumn = span ? "span 2" : "";
+        kbEl.append(b);
+      });
+    });
+  }
+
+  function keyAria(code){
+    const st = kbButtons[code].dataset.state;
+    const name = code === "EN" ? "Enter, envia a tentativa"
+              : code === "BS" ? "Backspace, apaga a última letra"
+              : "Tecla " + code;
+    if (st === "unknown") return name + ". Estado: ainda não usada";
+    return name + ". Estado: " + (st === "correct" ? "certa posição" : st === "present" ? "presente na palavra" : "ausente da palavra");
+  }
+
+  function setKeyState(ch, st){
+    const b = kbButtons[ch]; if (!b) return;
+    // Regra monotônica: correct > present > absent > unknown. Nunca regride.
+    if (KEY_RANK[st] > KEY_RANK[b.dataset.state]){
+      b.dataset.state = st;
+      b.setAttribute("aria-label", keyAria(ch));
+    }
+  }
+
+  function focusKeyboard(){
+    if (kbEl) kbEl.focus({ preventScroll:true });
+  }
+
+  /* =====================================================================
+     AÇÕES
+     ===================================================================== */
+  function typeLetter(ch){
+    if (game.over || game.current.length >= WORD_LEN) return;
+    game.current.push(ch);
+    clearError();
+    renderBoard(false);
+    say("Posição " + game.current.length + ": " + ch + ".");
+  }
+
+  function backspace(){
+    if (game.over || !game.current.length) return;
+    const removed = game.current.pop();
+    renderBoard(false);
+    say("Letra " + removed + " apagada.");
+  }
+
+  function submit(){
+    if (game.over) return;
+    const word = game.current.join("");
+
+    if (word.length < WORD_LEN){
+      fail("Faltam " + (WORD_LEN - word.length) + " letra(s). A palavra precisa ter 5 letras.");
+      shakeBoard(); return;
+    }
+    if (!ACCEPTED.has(word)){
+      fail('"' + word + '" não está no dicionário. Escolha uma palavra de 5 letras da lista.');
+      shakeBoard(); return;
+    }
+
+    clearError();
+    const fb = evaluate(word, TARGET);
+    game.guesses.push(word);
+    game.feedback.push(fb);
+    for (let i=0;i<WORD_LEN;i++) setKeyState(word[i], fb[i]);
+    game.current = [];
+
+    const won = word === TARGET;
+    renderBoard(true);
+    describeRow(game.guesses.length-1);
+
+    if (won){
+      game.over = true;
+      setTimeout(function(){
+        say("Vitória em " + game.guesses.length + " de " + MAX_GUESSES + " tentativas! A palavra era " + TARGET + ".");
+        showResult(true);
+      }, a11y.motion ? 600 : 0);
+    } else if (game.guesses.length >= MAX_GUESSES){
+      game.over = true;
+      setTimeout(function(){
+        say("Fim das tentativas. A palavra secreta era " + TARGET + ".");
+        showResult(false);
+      }, a11y.motion ? 600 : 0);
+    } else {
+      say("Tentativa " + game.guesses.length + " de " + MAX_GUESSES + " registrada. Faltam " + (MAX_GUESSES - game.guesses.length) + ".");
+    }
+    syncButtons();
+    focusKeyboard();
+  }
+
+  function describeRow(r){
+    const word = game.guesses[r], fb = game.feedback[r];
+    const parts = fb.map(function(st,i){
+      const base = word[i] + " " + STATE_NAME[st];
+      if (!a11y.hints) return base;
+      if (st === "present") return base + ", em outra posição";
+      if (st === "absent")  return base + ", não existe na palavra";
+      return base;
+    });
+    // A mensagem vai para a região polite; a linha do tabuleiro já tem rótulo.
+    window.setTimeout(function(){
+      statusEl.textContent = "Linha " + (r+1) + ": " + parts.join("; ") + ".";
+    }, 420);
+  }
+
+  function useReveal(){
+    if (game.over) return;
+    if (!game.powers.reveal){ fail("O poder Revelar já foi usado nesta partida."); return; }
+    const r = game.guesses.length;
+    let idx = -1;
+    for (let i=0;i<WORD_LEN;i++){ if ((game.current[i]||"") !== TARGET[i]){ idx = i; break; } }
+    if (idx === -1){
+      fail("Todas as posições já estão corretas — o poder Revelar não tem onde agir.");
+      shakeBoard(); return;
+    }
+    game.current[idx] = TARGET[idx];
+    game.revealed.add(r + "-" + idx);
+    game.powers.reveal = false;
+    clearError();
+    renderBoard(false);
+    syncButtons();
+    say("Poder Revelar usado. Posição " + (idx+1) + " preenchida com a letra " + TARGET[idx] + ".");
+    focusKeyboard();
+  }
+
+  function useEliminate(){
+    if (game.over) return;
+    if (!game.powers.eliminate){ fail("O poder Eliminar já foi usado nesta partida."); return; }
+    const inTarget = new Set(TARGET.split(""));
+    const picks = [];
+    for (const ch of LETTERS){
+      if (picks.length >= 2) break;
+      if (!inTarget.has(ch) && kbButtons[ch].dataset.state === "unknown") picks.push(ch);
+    }
+    if (!picks.length){
+      fail("Não há letras desconhecidas que possam ser eliminadas.");
+      shakeBoard(); return;
+    }
+    picks.forEach(function(ch){
+      kbButtons[ch].dataset.state = "absent";
+      kbButtons[ch].dataset.power = "1";
+      kbButtons[ch].setAttribute("aria-label", keyAria(ch) + ", eliminada pelo poder");
+    });
+    game.powers.eliminate = false;
+    clearError();
+    syncButtons();
+    say("Poder Eliminar usado. Letras desativadas: " + picks.join(", ") + ".");
+    focusKeyboard();
+  }
+
+  function syncButtons(){
+    pwReveal.disabled = !game.powers.reveal || game.over;
+    pwElim.disabled   = !game.powers.eliminate || game.over;
+    // aria-disabled reflete o estado para leitores de tela mesmo quando o
+    // elemento usa `disabled` (que já impede foco e clique).
+    pwReveal.setAttribute("aria-disabled", String(pwReveal.disabled));
+    pwElim.setAttribute("aria-disabled", String(pwElim.disabled));
+    restartBtn.disabled = game.guesses.length === 0;
+    restartBtn.setAttribute("aria-disabled", String(restartBtn.disabled));
+    const b1 = pwReveal.querySelector(".badge"), b2 = pwElim.querySelector(".badge");
+    b1.textContent = game.powers.reveal ? "1" : "0";
+    b2.textContent = game.powers.eliminate ? "1" : "0";
+  }
+
+  function restart(){
+    TARGET = sortearAlvo();
+    game.guesses.length = 0; game.feedback.length = 0;
+    game.current.length = 0; game.revealed.clear();
+    for (const ch of LETTERS){
+      kbButtons[ch].dataset.state = "unknown";
+      kbButtons[ch].dataset.power = "0";
+      kbButtons[ch].setAttribute("aria-label", keyAria(ch));
+    }
+    game.powers = { reveal:true, eliminate:true };
+    game.over = false;
+    resultEl.hidden = true;
+    clearError();
+    renderBoard(false);
+    syncButtons();
+    say("Nova partida: nova palavra sorteada. 6 tentativas disponíveis.");
+    focusKeyboard();
+  }
+
+  /* =====================================================================
+     RESULTADO / COMPARTILHAMENTO (sem spoiler)
+     ===================================================================== */
+  function dayIndex(){
+    return Math.floor((Date.now() - Date.UTC(2026,0,1)) / 86400000);
+  }
+  function buildShare(){
+    const set = shareFmt.value === "sym"
+      ? { correct:"✓", present:"~", absent:"✕" }
+      : { correct:"\u{1F7E6}", present:"\u{1F7E7}", absent:"\u{2B1B}" };
+    const rows = game.feedback.map(function(fb){
+      return fb.map(function(s){ return set[s]; }).join("");
+    }).join("\n");
+    return "Adivinha Palavra #" + dayIndex() + " " + game.guesses.length + "/" + MAX_GUESSES +
+           "\n" + rows + "\nhttps://adivinha.app";
+  }
+  function showResult(won){
+    // O veredito carrega a contagem DEPOIS da informação principal: quem usa
+    // leitor de tela ouve primeiro o que aconteceu, depois o placar.
+    resVerdict.textContent = won
+      ? "Vitória em " + game.guesses.length + " de " + MAX_GUESSES + " tentativas."
+      : "Fim de jogo em " + game.guesses.length + " de " + MAX_GUESSES + " tentativas. A palavra era " + TARGET + ".";
+    resMeta.textContent = won
+      ? "Acertou em " + game.guesses.length + " tentativa(s)."
+      : "Não encontrou " + TARGET + ". Tentativas: " + game.guesses.join(", ") + ".";
+    shareTxt.value = buildShare();
+    resultEl.hidden = false;
+    $("#resTitle").focus({ preventScroll:false });   // move o foco para o resultado
+  }
+
+  $("#shareFmt").addEventListener("change", function(){ shareTxt.value = buildShare(); });
+
+  $("#copyBtn").addEventListener("click", function(){
+    shareTxt.focus();
+    shareTxt.select();
+    const done = function(){
+      say("Texto copiado para a área de transferência. Ele não revela a palavra secreta.");
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(shareTxt.value).then(done, function(){
+        say("Não foi possível copiar automaticamente. O texto está selecionado: pressione Ctrl+C.");
+      });
+    } else {
+      try{ document.execCommand("copy"); done(); }
+      catch(e){ say("O texto está selecionado. Pressione Ctrl+C para copiar."); }
+    }
+  });
+
+  /* =====================================================================
+     EVENTOS
+     ===================================================================== */
+  kbEl.addEventListener("click", function(e){
+    const btn = e.target.closest(".key"); if (!btn) return;
+    const code = btn.dataset.code;
+    if (code === "EN") submit();
+    else if (code === "BS") backspace();
+    else typeLetter(code);
+    // Clique/toque real (e.detail > 0) devolve o foco ao teclado virtual, para
+    // que a digitação física continue funcionando. Ativação por Enter/Espaço
+    // (e.detail === 0) mantém o foco na tecla, como o usuário espera.
+    if (e.detail > 0) focusKeyboard();
+  });
+
+  // Botões de poder / reiniciar: mesmo tratamento de foco.
+  [pwReveal, pwElim, restartBtn].forEach(function(b){
+    b.addEventListener("click", function(e){ if (e.detail > 0) focusKeyboard(); });
+  });
+  pwReveal.addEventListener("click", useReveal);
+  pwElim.addEventListener("click", useEliminate);
+  restartBtn.addEventListener("click", restart);
+
+  /* --- Teclado físico -------------------------------------------------
+     Regras: nunca capturamos teclas dentro de campos de formulário nem
+     sobre botões/outros controles (senão o Enter do botão deixa de funcionar).
+     Enter só é tratado globalmente quando o foco NÃO está num controle.
+     (Não criamos atalhos de letra para os poderes: "R" e "E" são letras do
+     dicionário — conflito insolúvel; os poderes são acessados por Tab+Enter.) */
+  document.addEventListener("keydown", function(e){
+    if (e.ctrlKey || e.altKey || e.metaKey) return;
+    const t = e.target;
+    if (t && t.closest && t.closest("input,select,textarea,a[href],[contenteditable]")) return;
+    const onControl = t && t.closest && t.closest("button,[role='switch'],[tabindex='0']");
+
+    if (e.key === "Enter"){
+      if (onControl) return;          // deixa o controle tratar o Enter
+      e.preventDefault(); submit(); return;
+    }
+    if (e.key === "Backspace"){
+      if (onControl) return;
+      e.preventDefault(); backspace(); return;
+    }
+    if (e.key === "Escape"){
+      if (game.current.length){ e.preventDefault(); game.current.length = 0; renderBoard(false); say("Linha atual limpa."); }
+      return;
+    }
+    if (/^[a-zA-Z]$/.test(e.key)){
+      e.preventDefault();
+      typeLetter(e.key.toUpperCase());
+    }
+  });
+
+  /* --- Preferências ---------------------------------------------------- */
+  const binds = [
+    ["#tHC","hc",      function(v){ a11y.hc = v; },     function(){ return a11y.hc; }],
+    ["#tTex","tex",    function(v){ a11y.tex = v; },    function(){ return a11y.tex; }],
+    ["#tMotion","motion",function(v){ a11y.motion = v; },function(){ return a11y.motion; }],
+    ["#tText","text",   function(v){ a11y.text = v ? "large" : "normal"; }, function(){ return a11y.text === "large"; }],
+    ["#tHints","hints", function(v){ a11y.hints = v; renderBoard(false); }, function(){ return a11y.hints; }]
+  ];
+  binds.forEach(function(b){
+    const el = $(b[0]);
+    el.addEventListener("change", function(){
+      b[2](el.checked);
+      // prefers-reduced-motion do sistema tem precedência: se o SO pede
+      // redução, forçamos o estado em vez de respeitar o clique.
+      if (b[1] === "motion" && window.matchMedia("(prefers-reduced-motion: reduce)").matches) a11y.motion = false;
+      applyPrefs(); savePrefs();
+      if (b[1] === "hints") say(el.checked ? "Dicas detalhadas para leitor de tela ativadas." : "Rótulos curtos ativados.");
+    });
+  });
+
+  $("#themeBtn").addEventListener("click", function(){
+    a11y.theme = a11y.theme === "dark" ? "light" : "dark";
+    applyPrefs(); savePrefs();
+    say(a11y.theme === "dark" ? "Tema escuro ativado: fundo preto, texto branco." : "Tema claro ativado: fundo branco, texto preto.");
+  });
+
+  // Reflita o layout do teclado ao cruzar o breakpoint (mantém ordem visual =
+  // ordem de tabulação). Os botões são reordenados, nunca recriados, para não
+  // perder o estado de feedback.
+  let lastWide = window.matchMedia(KB_WIDE).matches;
+  window.addEventListener("resize", function(){
+    const w = window.matchMedia(KB_WIDE).matches;
+    if (w !== lastWide){ lastWide = w; layoutKeys(); syncKeyLabels(); }
+  });
+  function syncKeyLabels(){
+    for (const code of Object.keys(kbButtons)) kbButtons[code].setAttribute("aria-label", keyAria(code));
+  }
+
+  /* =====================================================================
+     BOOT
+     ===================================================================== */
+  loadPrefs();
+  applyPrefs();
+  TARGET = sortearAlvo();
+  buildBoard();
+  buildKeys();
+  layoutKeys();
+  syncKeyLabels();
+  renderBoard(false);
+  syncButtons();
+})();
+</script>
+</body>
+</html>
